@@ -325,6 +325,9 @@ const exportStudentsData = async (req, res) => {
       )
       .sort({ createdAt: -1 });
 
+    // Helper: wrap value in double quotes, escape internal double quotes (RFC 4180)
+    const escapeCSV = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+
     // Convert to CSV format
     const csvHeader =
       "Application Number,Full Name,Father Name,Mobile,Email,Course,12th Marks,Payment Status,Transaction ID,Amount,Payment Date,Submitted At\n";
@@ -332,18 +335,26 @@ const exportStudentsData = async (req, res) => {
     const csvData = applications
       .map((app) => {
         return [
-          app.applicationNumber,
-          app.fullName,
-          app.fatherName,
-          app.mobile,
-          app.email,
-          app.course,
-          app.twelfthMarks,
-          app.paymentStatus,
-          app.transactionId || "N/A",
-          app.amount,
-          app.paymentDate ? new Date(app.paymentDate).toLocaleString() : "N/A",
-          app.submittedAt ? new Date(app.submittedAt).toLocaleString() : "N/A",
+          escapeCSV(app.applicationNumber),
+          escapeCSV(app.fullName),
+          escapeCSV(app.fatherName),
+          escapeCSV(app.mobile),
+          escapeCSV(app.email),
+          escapeCSV(app.course),
+          escapeCSV(app.twelfthMarks),
+          escapeCSV(app.paymentStatus),
+          escapeCSV(app.transactionId || "N/A"),
+          escapeCSV(app.amount),
+          escapeCSV(
+            app.paymentDate
+              ? new Date(app.paymentDate).toLocaleString()
+              : "N/A",
+          ),
+          escapeCSV(
+            app.submittedAt
+              ? new Date(app.submittedAt).toLocaleString()
+              : "N/A",
+          ),
         ].join(",");
       })
       .join("\n");

@@ -282,7 +282,25 @@ const getPaymentStatus = async (req, res) => {
 const handleWebhook = async (req, res) => {
   try {
     const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
+
+    // Guard: webhook secret must be configured
+    if (!webhookSecret) {
+      console.error("Webhook Error: RAZORPAY_WEBHOOK_SECRET is not configured");
+      return res.status(500).json({
+        success: false,
+        message: "Webhook not configured on server",
+      });
+    }
+
     const signature = req.headers["x-razorpay-signature"];
+
+    // Guard: signature header must be present
+    if (!signature) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing webhook signature header",
+      });
+    }
 
     // Verify webhook signature
     const expectedSignature = crypto

@@ -94,13 +94,24 @@ const verifyOTPController = async (req, res) => {
       });
     }
 
-    // Find user
-    const user = await User.findOne({ mobile });
+    // Find user (select OTP fields which are excluded by default)
+    const user = await User.findOne({ mobile }).select(
+      "+otp +otpExpiry +otpAttempts +otpLockedUntil",
+    );
 
     if (!user) {
       return res.status(404).json({
         success: false,
         message: "User not found. Please request OTP first.",
+      });
+    }
+
+    // Check if user is locked out due to too many failed attempts
+    if (user.otpLockedUntil && user.otpLockedUntil > new Date()) {
+      const minutesLeft = Math.ceil((user.otpLockedUntil - Date.now()) / 60000);
+      return res.status(429).json({
+        success: false,
+        message: `Too many failed attempts. Please try again in ${minutesLeft} minute(s).`,
       });
     }
 
@@ -270,7 +281,17 @@ const updateProfile = async (req, res) => {
 
     // Update fields if provided
     if (name) user.name = name;
-    if (email) user.email = email;
+    if (email) {
+      // Validate email format
+      const emailRegex = /^\S+@\S+\.\S+$/;
+      if (!emailRegex.test(email)) {
+        return res.status(400).json({
+          success: false,
+          message: "Please provide a valid email address",
+        });
+      }
+      user.email = email.toLowerCase().trim();
+    }
 
     await user.save();
 

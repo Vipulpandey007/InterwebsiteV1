@@ -157,8 +157,12 @@ const downloadAdmitCard = async (req, res) => {
       });
     }
 
-    // Set headers for download
-    const filename = `Admit_Card_${application.applicationNumber}.pdf`;
+    // Set headers for download — sanitize filename to prevent header injection
+    const safeAppNumber = application.applicationNumber.replace(
+      /[^a-zA-Z0-9_-]/g,
+      "_",
+    );
+    const filename = `Admit_Card_${safeAppNumber}.pdf`;
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);

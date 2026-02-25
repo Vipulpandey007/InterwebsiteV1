@@ -56,8 +56,10 @@ const verifyRazorpaySignature = (orderId, paymentId, signature) => {
       .update(text)
       .digest("hex");
 
-    // Compare signatures
-    return expectedSignature === signature;
+    // Compare signatures using constant-time comparison to prevent timing attacks
+    const a = Buffer.from(expectedSignature, "hex");
+    const b = Buffer.from(signature, "hex");
+    return a.length === b.length && crypto.timingSafeEqual(a, b);
   } catch (error) {
     console.error("Signature Verification Error:", error);
     return false;

@@ -2,6 +2,7 @@ const express = require("express");
 const dotenv = require("dotenv");
 const cors = require("cors");
 const morgan = require("morgan");
+const path = require("path");
 const connectDB = require("./config/db");
 
 // Load environment variables
@@ -12,6 +13,10 @@ const app = express();
 
 // Connect to MongoDB
 connectDB();
+
+// Raw body parser for Razorpay webhook (must be before express.json)
+// Razorpay signature verification requires the raw, unparsed body
+app.use("/api/payment/webhook", express.raw({ type: "application/json" }));
 
 // Middleware
 app.use(express.json());
@@ -31,8 +36,8 @@ if (process.env.NODE_ENV === "development") {
 }
 
 // Static files (for uploaded documents and generated PDFs)
-app.use("/uploads", express.static("uploads"));
-app.use("/pdfs", express.static("pdfs"));
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+app.use("/pdfs", express.static(path.join(__dirname, "pdfs")));
 
 // Health check route
 app.get("/api/health", (req, res) => {
@@ -45,7 +50,7 @@ app.get("/api/health", (req, res) => {
 
 // API Routes
 app.use("/api/auth", require("./routes/auth"));
-app.use("/api/applications", require("./routes/applications"));
+app.use("/api/applications", require("./routes/application"));
 app.use("/api/payment", require("./routes/payment"));
 app.use("/api/pdf", require("./routes/pdf"));
 app.use("/api/admin", require("./routes/admin"));

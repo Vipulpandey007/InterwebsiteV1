@@ -1,5 +1,5 @@
 const Application = require("../models/Application");
-const User = require("../models/User");
+const mongoose = require("mongoose");
 
 /**
  * @desc    Create new application (save as draft or submit)
@@ -190,7 +190,7 @@ const getApplicationById = async (req, res) => {
 
     const application = await Application.findById(id).populate(
       "userId",
-      "mobile name email"
+      "mobile name email",
     );
 
     if (!application) {
@@ -378,7 +378,7 @@ const getApplicationStats = async (req, res) => {
     const userId = req.user.id;
 
     const stats = await Application.aggregate([
-      { $match: { userId: mongoose.Types.ObjectId(userId) } },
+      { $match: { userId: new mongoose.Types.ObjectId(userId) } },
       {
         $group: {
           _id: null,

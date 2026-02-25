@@ -145,15 +145,26 @@ const applicationSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
-// Generate unique application number before saving
+// Generate unique application number before saving (atomic, race-condition-safe)
 applicationSchema.pre("save", async function (next) {
   if (this.isNew && !this.applicationNumber) {
-    const year = new Date().getFullYear();
-    const count = await mongoose.model("Application").countDocuments();
-    this.applicationNumber = `APP${year}${String(count + 1).padStart(6, "0")}`;
+    try {
+      const year = new Date().getFullYear();
+      // Atomic increment using a Counter collection
+      const Counter = mongoose.connection.collection("counters");
+      const result = await Counter.findOneAndUpdate(
+        { _id: `applicationNumber_${year}` },
+        { $inc: { seq: 1 } },
+        { upsert: true, returnDocument: "after" },
+      );
+      const seq = result.seq;
+      this.applicationNumber = `APP${year}${String(seq).padStart(6, "0")}`;
+    } catch (err) {
+      return next(err);
+    }
   }
   next();
 });

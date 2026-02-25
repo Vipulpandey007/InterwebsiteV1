@@ -1,117 +1,144 @@
 const mongoose = require("mongoose");
-const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
 
-const adminSchema = new mongoose.Schema(
+const userSchema = new mongoose.Schema(
   {
-    name: {
-      type: String,
-      required: [true, "Name is required"],
-      trim: true,
-    },
-    email: {
-      type: String,
-      required: [true, "Email is required"],
-      unique: true,
-      lowercase: true,
-      trim: true,
-      match: [/^\S+@\S+\.\S+$/, "Please enter a valid email"],
-    },
-    password: {
-      type: String,
-      required: [true, "Password is required"],
-      minlength: 6,
-      select: false, // Don't include password in queries by default
-    },
     mobile: {
       type: String,
       required: [true, "Mobile number is required"],
+      unique: true,
+      trim: true,
       match: [/^[0-9]{10}$/, "Please enter a valid 10-digit mobile number"],
+    },
+    name: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    email: {
+      type: String,
+      lowercase: true,
+      trim: true,
+      match: [/^\S+@\S+\.\S+$/, "Please enter a valid email"],
+      default: null,
     },
     role: {
       type: String,
-      enum: ["super_admin", "admin", "reviewer"],
-      default: "admin",
+      enum: ["user", "admin"],
+      default: "user",
     },
-    permissions: [
-      {
-        type: String,
-        enum: [
-          "view_applications",
-          "review_applications",
-          "manage_users",
-          "manage_admins",
-          "view_reports",
-          "manage_settings",
-        ],
-      },
-    ],
+    isVerified: {
+      type: Boolean,
+      default: false,
+    },
     isActive: {
       type: Boolean,
       default: true,
     },
-    lastLogin: {
-      type: Date,
+
+    // OTP fields
+    otp: {
+      type: String,
+      default: null,
+      select: false,
     },
-    createdBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Admin",
+    otpExpiry: {
+      type: Date,
+      default: null,
+      select: false,
+    },
+    otpAttempts: {
+      type: Number,
+      default: 0,
+      select: false,
+    },
+    otpLockedUntil: {
+      type: Date,
+      default: null,
+      select: false,
     },
   },
   {
     timestamps: true,
-  }
+  },
 );
 
-// Hash password before saving
-adminSchema.pre("save", async function (next) {
-  if (!this.isModified("password")) {
-    return next();
-  }
+/**
+ * Generate a 6-digit OTP and store its hash + expiry on the user document.
+ * Returns the plain OTP to be sent to the user.
+ */
+userSchema.methods.generateOTP = function () {
+  // Generate random 6-digit OTP
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
-  try {
-    const salt = await bcrypt.genSalt(10);
-    this.password = await bcrypt.hash(this.password, salt);
-    next();
-  } catch (error) {
-    next(error);
-  }
-});
+  // Store hashed OTP (avoid storing plain text in DB)
+  this.otp = crypto.createHash("sha256").update(otp).digest("hex");
 
-// Method to compare password
-adminSchema.methods.comparePassword = async function (candidatePassword) {
-  return await bcrypt.compare(candidatePassword, this.password);
+  // OTP expires in 10 minutes
+  this.otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
+
+  // Reset attempts on new OTP generation
+  this.otpAttempts = 0;
+  this.otpLockedUntil = null;
+
+  return otp; // Return plain OTP to send via SMS
 };
 
-// Method to get permissions based on role
-adminSchema.methods.getPermissions = function () {
-  const rolePermissions = {
-    super_admin: [
-      "view_applications",
-      "review_applications",
-      "manage_users",
-      "manage_admins",
-      "view_reports",
-      "manage_settings",
-    ],
-    admin: [
-      "view_applications",
-      "review_applications",
-      "manage_users",
-      "view_reports",
-    ],
-    reviewer: ["view_applications", "review_applications"],
-  };
+/**
+ * Verify the provided OTP against the stored hash.
+ * Tracks failed attempts and locks account after 5 failures.
+ * Returns true if valid, false otherwise.
+ */
+userSchema.methods.verifyOTP = function (candidateOTP) {
+  // Check if account is locked
+  if (this.otpLockedUntil && this.otpLockedUntil > new Date()) {
+    return false;
+  }
 
-  return this.permissions.length > 0
-    ? this.permissions
-    : rolePermissions[this.role] || [];
+  // Check if OTP exists and hasn't expired
+  if (!this.otp || !this.otpExpiry || this.otpExpiry < new Date()) {
+    return false;
+  }
+
+  // Hash the candidate OTP and compare
+  const hashedCandidate = crypto
+    .createHash("sha256")
+    .update(candidateOTP)
+    .digest("hex");
+
+  const isValid = this.otp === hashedCandidate;
+
+  if (!isValid) {
+    // Increment failed attempts
+    this.otpAttempts = (this.otpAttempts || 0) + 1;
+
+    // Lock after 5 failed attempts for 15 minutes
+    if (this.otpAttempts >= 5) {
+      this.otpLockedUntil = new Date(Date.now() + 15 * 60 * 1000);
+    }
+  }
+
+  return isValid;
 };
 
-// Index for faster queries
-adminSchema.index({ email: 1 });
-adminSchema.index({ role: 1 });
-adminSchema.index({ isActive: 1 });
+/**
+ * Clear OTP fields after successful verification.
+ * Also marks the user as verified.
+ */
+userSchema.methods.clearOTP = function () {
+  this.otp = null;
+  this.otpExpiry = null;
+  this.otpAttempts = 0;
+  this.otpLockedUntil = null;
+  this.isVerified = true;
+};
 
-const Admin = mongoose.model("Admin", adminSchema);
+// Indexes for faster queries
+userSchema.index({ mobile: 1 });
+userSchema.index({ email: 1 });
+userSchema.index({ role: 1 });
+userSchema.index({ isActive: 1 });
 
-module.exports = Admin;
+const User = mongoose.model("User", userSchema);
+
+module.exports = User;
