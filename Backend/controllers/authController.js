@@ -1,154 +1,273 @@
 const User = require("../models/User");
 const { generateToken } = require("../utils/jwtUtils");
-const { sendOTP } = require("../utils/otpService");
+const { sendOTP } = require("../utils/smsService");
 
 /**
- * @desc    Send OTP to mobile number
- * @route   POST /api/auth/send-otp
+ * @desc    Register new user (Step 1: Signup)
+ * @route   POST /api/auth/signup
  * @access  Public
  */
-const sendOTPController = async (req, res) => {
+const signupController = async (req, res) => {
+  try {
+    const { name, email, mobile } = req.body;
+
+    // Validate input
+    if (!name || !email || !mobile) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide name, email, and mobile number",
+      });
+    }
+
+    // Check if mobile already exists
+    const existingMobile = await User.findOne({ mobile });
+    if (existingMobile) {
+      return res.status(400).json({
+        success: false,
+        message: "Mobile number already registered",
+      });
+    }
+
+    // Check if email already exists
+    const existingEmail = await User.findOne({ email });
+    if (existingEmail) {
+      return res.status(400).json({
+        success: false,
+        message: "Email already registered",
+      });
+    }
+
+    // Create new user
+    const user = new User({
+      name,
+      email,
+      mobile,
+      isVerified: false,
+      isMobileVerified: false,
+    });
+
+    // Generate OTP
+    const otp = user.generateOTP();
+    await user.save();
+
+    // Send OTP
+    try {
+      await sendOTP(mobile, otp);
+      console.log(`📱 OTP for ${mobile}: ${otp}`);
+    } catch (error) {
+      console.error("SMS Error:", error);
+    }
+
+    res.status(201).json({
+      success: true,
+      message: "Signup successful! OTP sent to your mobile number",
+      data: {
+        userId: user._id,
+        name: user.name,
+        email: user.email,
+        mobile: user.mobile,
+      },
+    });
+  } catch (error) {
+    console.error("Signup Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Signup failed. Please try again.",
+    });
+  }
+};
+
+/**
+ * @desc    Verify OTP and complete signup (Step 2)
+ * @route   POST /api/auth/verify-signup
+ * @access  Public
+ */
+const verifySignupController = async (req, res) => {
+  try {
+    const { mobile, otp } = req.body;
+
+    if (!mobile || !otp) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide mobile number and OTP",
+      });
+    }
+
+    const user = await User.findOne({ mobile });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found. Please signup first.",
+      });
+    }
+
+    if (user.isMobileVerified) {
+      return res.status(400).json({
+        success: false,
+        message: "Mobile already verified. Please login.",
+      });
+    }
+
+    if (!user.verifyOTP(otp)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid or expired OTP",
+      });
+    }
+
+    // Mark as verified
+    user.isVerified = true;
+    user.isMobileVerified = true;
+    user.clearOTP();
+    user.updateLastLogin();
+    await user.save();
+
+    // Generate token
+    const token = generateToken(user._id, user.role);
+
+    res.status(200).json({
+      success: true,
+      message: "Signup completed successfully!",
+      data: {
+        token,
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          mobile: user.mobile,
+          isVerified: user.isVerified,
+          role: user.role,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Verify Signup Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Verification failed. Please try again.",
+    });
+  }
+};
+
+/**
+ * @desc    Login (Step 1: Send OTP)
+ * @route   POST /api/auth/login
+ * @access  Public
+ */
+const loginController = async (req, res) => {
   try {
     const { mobile } = req.body;
 
-    // Validate mobile number
     if (!mobile) {
       return res.status(400).json({
         success: false,
-        message: "Mobile number is required",
+        message: "Please provide mobile number",
       });
     }
 
-    // Validate mobile number format (10 digits)
-    const mobileRegex = /^[0-9]{10}$/;
-    if (!mobileRegex.test(mobile)) {
-      return res.status(400).json({
-        success: false,
-        message: "Please enter a valid 10-digit mobile number",
-      });
-    }
-
-    // Check if user exists, if not create new user
-    let user = await User.findOne({ mobile });
+    const user = await User.findOne({ mobile });
 
     if (!user) {
-      user = new User({ mobile });
+      return res.status(404).json({
+        success: false,
+        message: "Mobile number not registered. Please signup first.",
+      });
+    }
+
+    if (!user.isMobileVerified) {
+      return res.status(400).json({
+        success: false,
+        message: "Mobile not verified. Please complete signup first.",
+      });
     }
 
     // Generate OTP
     const otp = user.generateOTP();
-
-    // Save user with OTP
     await user.save();
 
-    // Send OTP via SMS
+    // Send OTP
     try {
       await sendOTP(mobile, otp);
+      console.log(`📱 OTP for ${mobile}: ${otp}`);
     } catch (error) {
-      console.error("OTP Send Error:", error);
-      return res.status(500).json({
-        success: false,
-        message: "Failed to send OTP. Please try again.",
-      });
+      console.error("SMS Error:", error);
     }
 
     res.status(200).json({
       success: true,
       message: "OTP sent successfully",
       data: {
-        mobile: mobile,
-        expiresIn: "10 minutes",
+        mobile: user.mobile,
       },
     });
   } catch (error) {
-    console.error("Send OTP Error:", error);
+    console.error("Login Error:", error);
     res.status(500).json({
       success: false,
-      message: "Server error. Please try again later.",
+      message: "Login failed. Please try again.",
     });
   }
 };
 
 /**
- * @desc    Verify OTP and login user
- * @route   POST /api/auth/verify-otp
+ * @desc    Verify OTP and login (Step 2)
+ * @route   POST /api/auth/verify-login
  * @access  Public
  */
-const verifyOTPController = async (req, res) => {
+const verifyLoginController = async (req, res) => {
   try {
     const { mobile, otp } = req.body;
 
-    // Validate input
     if (!mobile || !otp) {
       return res.status(400).json({
         success: false,
-        message: "Mobile number and OTP are required",
+        message: "Please provide mobile number and OTP",
       });
     }
 
-    // Validate OTP format (6 digits)
-    if (!/^[0-9]{6}$/.test(otp)) {
-      return res.status(400).json({
-        success: false,
-        message: "OTP must be 6 digits",
-      });
-    }
-
-    // Find user
     const user = await User.findOne({ mobile });
 
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: "User not found. Please request OTP first.",
+        message: "User not found",
       });
     }
 
-    // Check if OTP exists
-    if (!user.otp) {
+    if (!user.verifyOTP(otp)) {
       return res.status(400).json({
         success: false,
-        message: "No OTP found. Please request a new OTP.",
+        message: "Invalid or expired OTP",
       });
     }
 
-    // Verify OTP
-    const isValidOTP = user.verifyOTP(otp);
-
-    if (!isValidOTP) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid or expired OTP. Please try again.",
-      });
-    }
-
-    // Clear OTP and mark as verified
     user.clearOTP();
+    user.updateLastLogin();
     await user.save();
 
-    // Generate JWT token
     const token = generateToken(user._id, user.role);
 
     res.status(200).json({
       success: true,
       message: "Login successful",
       data: {
-        token: token,
+        token,
         user: {
           id: user._id,
-          mobile: user.mobile,
           name: user.name,
           email: user.email,
-          role: user.role,
+          mobile: user.mobile,
           isVerified: user.isVerified,
+          role: user.role,
         },
       },
     });
   } catch (error) {
-    console.error("Verify OTP Error:", error);
+    console.error("Verify Login Error:", error);
     res.status(500).json({
       success: false,
-      message: "Server error. Please try again later.",
+      message: "Login verification failed. Please try again.",
     });
   }
 };
@@ -165,47 +284,41 @@ const resendOTPController = async (req, res) => {
     if (!mobile) {
       return res.status(400).json({
         success: false,
-        message: "Mobile number is required",
+        message: "Please provide mobile number",
       });
     }
 
-    // Find user
     const user = await User.findOne({ mobile });
 
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: "User not found. Please send OTP first.",
+        message: "User not found",
       });
     }
 
-    // Generate new OTP
     const otp = user.generateOTP();
     await user.save();
 
-    // Send OTP
     try {
       await sendOTP(mobile, otp);
+      console.log(`📱 OTP for ${mobile}: ${otp}`);
     } catch (error) {
-      return res.status(500).json({
-        success: false,
-        message: "Failed to send OTP. Please try again.",
-      });
+      console.error("SMS Error:", error);
     }
 
     res.status(200).json({
       success: true,
       message: "OTP resent successfully",
       data: {
-        mobile: mobile,
-        expiresIn: "10 minutes",
+        mobile: user.mobile,
       },
     });
   } catch (error) {
     console.error("Resend OTP Error:", error);
     res.status(500).json({
       success: false,
-      message: "Server error. Please try again later.",
+      message: "Failed to resend OTP. Please try again.",
     });
   }
 };
@@ -213,12 +326,11 @@ const resendOTPController = async (req, res) => {
 /**
  * @desc    Get current user profile
  * @route   GET /api/auth/me
- * @access  Private (requires JWT token)
+ * @access  Private
  */
-const getCurrentUser = async (req, res) => {
+const getMeController = async (req, res) => {
   try {
-    // req.user is set by auth middleware
-    const user = await User.findById(req.user.id).select("-otp -otpExpiry");
+    const user = await User.findById(req.user.id).select("-otp -otpExpires");
 
     if (!user) {
       return res.status(404).json({
@@ -232,90 +344,51 @@ const getCurrentUser = async (req, res) => {
       data: {
         user: {
           id: user._id,
-          mobile: user.mobile,
           name: user.name,
           email: user.email,
-          role: user.role,
+          mobile: user.mobile,
           isVerified: user.isVerified,
+          role: user.role,
           createdAt: user.createdAt,
         },
       },
     });
   } catch (error) {
-    console.error("Get Current User Error:", error);
+    console.error("Get Me Error:", error);
     res.status(500).json({
       success: false,
-      message: "Server error",
+      message: "Failed to fetch user data",
     });
   }
 };
 
 /**
- * @desc    Update user profile
- * @route   PUT /api/auth/profile
- * @access  Private
- */
-const updateProfile = async (req, res) => {
-  try {
-    const { name, email } = req.body;
-
-    const user = await User.findById(req.user.id);
-
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
-      });
-    }
-
-    // Update fields if provided
-    if (name) user.name = name;
-    if (email) user.email = email;
-
-    await user.save();
-
-    res.status(200).json({
-      success: true,
-      message: "Profile updated successfully",
-      data: {
-        user: {
-          id: user._id,
-          mobile: user.mobile,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-        },
-      },
-    });
-  } catch (error) {
-    console.error("Update Profile Error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Server error",
-    });
-  }
-};
-
-/**
- * @desc    Logout user (client-side token removal)
+ * @desc    Logout user
  * @route   POST /api/auth/logout
  * @access  Private
  */
-const logout = async (req, res) => {
-  // Since we're using JWT, logout is handled client-side by removing the token
-  // This endpoint can be used for logging purposes or token blacklisting if implemented
-
-  res.status(200).json({
-    success: true,
-    message: "Logged out successfully",
-  });
+const logoutController = async (req, res) => {
+  try {
+    res.status(200).json({
+      success: true,
+      message: "Logged out successfully",
+    });
+  } catch (error) {
+    console.error("Logout Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Logout failed",
+    });
+  }
 };
 
+// ✅ IMPORTANT: Export ALL functions
 module.exports = {
-  sendOTPController,
-  verifyOTPController,
+  signupController,
+  verifySignupController,
+  loginController,
+  verifyLoginController,
   resendOTPController,
-  getCurrentUser,
-  updateProfile,
-  logout,
+  getMeController,
+  logoutController,
 };

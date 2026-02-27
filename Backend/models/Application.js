@@ -145,7 +145,7 @@ const applicationSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Generate unique application number before saving
@@ -183,6 +183,6 @@ applicationSchema.index({ email: 1 });
 applicationSchema.index({ mobile: 1 });
 applicationSchema.index({ createdAt: -1 });
 
-const Application = mongoose.model("Application", applicationSchema);
-
-module.exports = Application;
+module.exports =
+  mongoose.models.Application ||
+  mongoose.model("Application", applicationSchema);

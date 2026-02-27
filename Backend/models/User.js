@@ -1,117 +1,66 @@
 const mongoose = require("mongoose");
-const bcrypt = require("bcryptjs");
 
-const adminSchema = new mongoose.Schema(
+const userSchema = new mongoose.Schema(
   {
-    name: {
+    mobile: {
       type: String,
-      required: [true, "Name is required"],
-      trim: true,
+      required: true,
+      unique: true,
+      match: [/^[0-9]{10}$/, "Please enter valid mobile"],
     },
     email: {
       type: String,
-      required: [true, "Email is required"],
+      required: true,
       unique: true,
       lowercase: true,
-      trim: true,
-      match: [/^\S+@\S+\.\S+$/, "Please enter a valid email"],
+      match: [/^\S+@\S+\.\S+$/, "Please enter valid email"],
     },
-    password: {
+    name: {
       type: String,
-      required: [true, "Password is required"],
-      minlength: 6,
-      select: false, // Don't include password in queries by default
-    },
-    mobile: {
-      type: String,
-      required: [true, "Mobile number is required"],
-      match: [/^[0-9]{10}$/, "Please enter a valid 10-digit mobile number"],
+      required: true,
+      minlength: 2,
     },
     role: {
       type: String,
-      enum: ["super_admin", "admin", "reviewer"],
-      default: "admin",
+      enum: ["user", "admin"],
+      default: "user",
     },
-    permissions: [
-      {
-        type: String,
-        enum: [
-          "view_applications",
-          "review_applications",
-          "manage_users",
-          "manage_admins",
-          "view_reports",
-          "manage_settings",
-        ],
-      },
-    ],
-    isActive: {
+    isVerified: {
       type: Boolean,
-      default: true,
+      default: false,
     },
-    lastLogin: {
-      type: Date,
+    isMobileVerified: {
+      type: Boolean,
+      default: false,
     },
-    createdBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Admin",
-    },
+    otp: String,
+    otpExpires: Date,
+    lastLogin: Date,
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true },
 );
 
-// Hash password before saving
-adminSchema.pre("save", async function (next) {
-  if (!this.isModified("password")) {
-    return next();
-  }
-
-  try {
-    const salt = await bcrypt.genSalt(10);
-    this.password = await bcrypt.hash(this.password, salt);
-    next();
-  } catch (error) {
-    next(error);
-  }
-});
-
-// Method to compare password
-adminSchema.methods.comparePassword = async function (candidatePassword) {
-  return await bcrypt.compare(candidatePassword, this.password);
+// Methods
+userSchema.methods.generateOTP = function () {
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  this.otp = otp;
+  this.otpExpires = new Date(Date.now() + 10 * 60 * 1000);
+  return otp;
 };
 
-// Method to get permissions based on role
-adminSchema.methods.getPermissions = function () {
-  const rolePermissions = {
-    super_admin: [
-      "view_applications",
-      "review_applications",
-      "manage_users",
-      "manage_admins",
-      "view_reports",
-      "manage_settings",
-    ],
-    admin: [
-      "view_applications",
-      "review_applications",
-      "manage_users",
-      "view_reports",
-    ],
-    reviewer: ["view_applications", "review_applications"],
-  };
-
-  return this.permissions.length > 0
-    ? this.permissions
-    : rolePermissions[this.role] || [];
+userSchema.methods.verifyOTP = function (candidateOTP) {
+  if (!this.otp) return false;
+  if (this.otpExpires < new Date()) return false;
+  return this.otp === candidateOTP;
 };
 
-// Index for faster queries
-adminSchema.index({ email: 1 });
-adminSchema.index({ role: 1 });
-adminSchema.index({ isActive: 1 });
+userSchema.methods.clearOTP = function () {
+  this.otp = undefined;
+  this.otpExpires = undefined;
+};
 
-const Admin = mongoose.model("Admin", adminSchema);
+userSchema.methods.updateLastLogin = function () {
+  this.lastLogin = new Date();
+};
 
-module.exports = Admin;
+module.exports = mongoose.models.User || mongoose.model("User", userSchema);

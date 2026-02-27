@@ -20,7 +20,7 @@ const adminSchema = new mongoose.Schema(
       type: String,
       required: [true, "Password is required"],
       minlength: 6,
-      select: false, // Don't include password in queries by default
+      select: false,
     },
     mobile: {
       type: String,
@@ -112,6 +112,5 @@ adminSchema.index({ email: 1 });
 adminSchema.index({ role: 1 });
 adminSchema.index({ isActive: 1 });
 
-const Admin = mongoose.model("Admin", adminSchema);
-
-module.exports = Admin;
+// ✅ FIX: Check if model exists before creating
+module.exports = mongoose.models.Admin || mongoose.model("Admin", adminSchema);
