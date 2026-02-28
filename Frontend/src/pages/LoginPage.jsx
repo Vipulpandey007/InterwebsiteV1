@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { authAPI } from "../services/api";
 import toast from "react-hot-toast";
@@ -12,7 +12,8 @@ const LoginPage = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
 
-  const handleSendOTP = async (e) => {
+  // Step 1: Send OTP to registered mobile
+  const handleLogin = async (e) => {
     e.preventDefault();
 
     if (mobile.length !== 10) {
@@ -22,18 +23,43 @@ const LoginPage = () => {
 
     setLoading(true);
     try {
-      const response = await authAPI.sendOTP(mobile);
+      const response = await authAPI.login(mobile);
       if (response.data.success) {
         toast.success("OTP sent successfully! Check your phone.");
         setStep(2);
       }
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to send OTP");
+      const errorMsg = error.response?.data?.message || "Failed to send OTP";
+      toast.error(errorMsg);
+
+      // If mobile not registered, suggest signup
+      if (errorMsg.includes("not registered") || errorMsg.includes("signup")) {
+        setTimeout(() => {
+          toast(
+            (t) => (
+              <div>
+                <p className="font-semibold mb-2">Mobile not registered!</p>
+                <button
+                  onClick={() => {
+                    toast.dismiss(t.id);
+                    navigate("/signup");
+                  }}
+                  className="bg-primary-500 text-white px-4 py-2 rounded-lg text-sm"
+                >
+                  Go to Signup
+                </button>
+              </div>
+            ),
+            { duration: 5000 },
+          );
+        }, 1000);
+      }
     } finally {
       setLoading(false);
     }
   };
 
+  // Step 2: Verify OTP
   const handleVerifyOTP = async (e) => {
     e.preventDefault();
 
@@ -44,7 +70,7 @@ const LoginPage = () => {
 
     setLoading(true);
     try {
-      const response = await authAPI.verifyOTP(mobile, otp);
+      const response = await authAPI.verifyLogin(mobile, otp);
       if (response.data.success) {
         const { token, user } = response.data.data;
         login(user, token);
@@ -58,10 +84,11 @@ const LoginPage = () => {
     }
   };
 
+  // Resend OTP
   const handleResendOTP = async () => {
     setLoading(true);
     try {
-      await authAPI.sendOTP(mobile);
+      await authAPI.resendOTP(mobile);
       toast.success("OTP resent successfully!");
     } catch (error) {
       toast.error("Failed to resend OTP");
@@ -100,18 +127,18 @@ const LoginPage = () => {
           <div className="text-center mb-8">
             <div className="text-5xl mb-4">🎓</div>
             <h1 className="text-3xl font-bold text-gray-800 mb-2">
-              Student Login
+              {step === 1 ? "Student Login" : "Verify OTP"}
             </h1>
             <p className="text-gray-600">
               {step === 1
-                ? "Enter your mobile number to continue"
+                ? "Enter your registered mobile number"
                 : "Enter the OTP sent to your phone"}
             </p>
           </div>
 
           {/* Step 1: Mobile Number */}
           {step === 1 && (
-            <form onSubmit={handleSendOTP} className="space-y-6">
+            <form onSubmit={handleLogin} className="space-y-6">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   Mobile Number
@@ -163,6 +190,16 @@ const LoginPage = () => {
                   "Send OTP"
                 )}
               </button>
+
+              <div className="text-center text-sm text-gray-600">
+                Don't have an account?{" "}
+                <Link
+                  to="/signup"
+                  className="text-primary-600 hover:text-primary-700 font-medium"
+                >
+                  Sign up here
+                </Link>
+              </div>
             </form>
           )}
 
@@ -219,7 +256,7 @@ const LoginPage = () => {
                     Verifying...
                   </span>
                 ) : (
-                  "Verify OTP"
+                  "Verify OTP & Login"
                 )}
               </button>
 

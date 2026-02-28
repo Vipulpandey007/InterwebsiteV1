@@ -8,10 +8,10 @@ import { Toaster } from "react-hot-toast";
 import { AuthProvider } from "./context/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import LandingPage from "./pages/LandingPage";
+import SignupPage from "./pages/SignupPage";
 import LoginPage from "./pages/LoginPage";
 import Dashboard from "./pages/Dashboard";
 import ApplicationForm from "./pages/ApplicationForm";
-import SignupPage from "./pages/SignUpPage";
 
 function App() {
   return (
