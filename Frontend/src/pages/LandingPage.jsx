@@ -145,7 +145,7 @@ const LandingPage = () => {
 
       {/* Footer */}
       <div className="text-center text-white/80 pb-8">
-        <p>&copy; 2026 College Name. All rights reserved.</p>
+        <p>&copy; 2026 Gossner College. All rights reserved.</p>
       </div>
     </div>
   );

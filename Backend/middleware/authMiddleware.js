@@ -1,193 +1,101 @@
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
-const Admin = require("../models/Admin");
 
-/**
- * Protect routes - Verify JWT token
- * Add this middleware to any route that requires authentication
- */
 const protect = async (req, res, next) => {
+  console.log("\n╔════════════════════════════════════════╗");
+  console.log("║     AUTH MIDDLEWARE - PROTECT          ║");
+  console.log("╚════════════════════════════════════════╝");
+
   let token;
 
-  // Check if token exists in Authorization header
-  if (
-    req.headers.authorization &&
-    req.headers.authorization.startsWith("Bearer")
-  ) {
+  console.log("📍 URL:", req.originalUrl);
+  console.log("📍 Method:", req.method);
+  console.log("📍 All Headers:", JSON.stringify(req.headers, null, 2));
+
+  // Check for authorization header
+  const authHeader = req.headers.authorization || req.headers.Authorization;
+  console.log("📍 Authorization Header:", authHeader);
+
+  if (authHeader && authHeader.startsWith("Bearer")) {
     try {
-      // Get token from header (format: "Bearer <token>")
-      token = req.headers.authorization.split(" ")[1];
+      // Extract token
+      token = authHeader.split(" ")[1];
+      console.log("✅ Token extracted successfully");
+      console.log("📍 Token (first 50 chars):", token.substring(0, 50) + "...");
+
+      // Check if JWT_SECRET exists
+      if (!process.env.JWT_SECRET) {
+        console.error("❌ JWT_SECRET not found in environment variables!");
+        return res.status(500).json({
+          success: false,
+          message: "Server configuration error",
+        });
+      }
+
+      console.log("✅ JWT_SECRET exists");
 
       // Verify token
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      console.log("✅ Token verified successfully");
+      console.log("📍 Decoded token:", JSON.stringify(decoded, null, 2));
 
-      // Get user from token (exclude sensitive fields)
-      req.user = await User.findById(decoded.id).select("-otp -otpExpiry");
+      // Get user from database
+      console.log("🔍 Finding user with ID:", decoded.id);
+      const user = await User.findById(decoded.id).select("-otp -otpExpires");
 
-      if (!req.user) {
+      if (!user) {
+        console.error("❌ User not found in database");
         return res.status(401).json({
           success: false,
           message: "User not found",
         });
       }
 
-      // Check if user is active
-      if (!req.user.isActive) {
-        return res.status(403).json({
-          success: false,
-          message: "Your account has been deactivated",
-        });
-      }
+      console.log("✅ User found:", user.name, "(" + user.email + ")");
+
+      // Attach user to request
+      req.user = user;
+
+      console.log("✅ User attached to req.user");
+      console.log("╔════════════════════════════════════════╗");
+      console.log("║     AUTHENTICATION SUCCESSFUL          ║");
+      console.log("╚════════════════════════════════════════╝\n");
 
       next();
     } catch (error) {
-      console.error("Auth Middleware Error:", error.message);
+      console.error("\n╔════════════════════════════════════════╗");
+      console.error("║     AUTHENTICATION FAILED              ║");
+      console.error("╚════════════════════════════════════════╝");
+      console.error("❌ Error Type:", error.name);
+      console.error("❌ Error Message:", error.message);
+      console.error("❌ Stack:", error.stack);
+
+      let message = "Not authorized, token failed";
+
+      if (error.name === "TokenExpiredError") {
+        message = "Token expired, please login again";
+      } else if (error.name === "JsonWebTokenError") {
+        message = "Invalid token";
+      }
+
       return res.status(401).json({
         success: false,
-        message: "Not authorized, token failed",
+        message: message,
       });
     }
-  }
+  } else {
+    console.error("\n╔════════════════════════════════════════╗");
+    console.error("║     NO TOKEN PROVIDED                  ║");
+    console.error("╚════════════════════════════════════════╝");
+    console.error("❌ Authorization header missing or invalid format");
+    console.error("❌ Expected: Bearer <token>");
+    console.error("❌ Received:", authHeader || "undefined");
 
-  if (!token) {
     return res.status(401).json({
       success: false,
-      message: "Not authorized, no token provided",
+      message: "Not authorized, no token",
     });
   }
 };
 
-/**
- * Admin protect - Verify admin token
- * Use this for admin-only routes
- */
-const adminProtect = async (req, res, next) => {
-  let token;
-
-  if (
-    req.headers.authorization &&
-    req.headers.authorization.startsWith("Bearer")
-  ) {
-    try {
-      token = req.headers.authorization.split(" ")[1];
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-      // Get admin from token
-      req.admin = await Admin.findById(decoded.id).select("-password");
-
-      if (!req.admin) {
-        return res.status(401).json({
-          success: false,
-          message: "Admin not found",
-        });
-      }
-
-      // Check if admin is active
-      if (!req.admin.isActive) {
-        return res.status(403).json({
-          success: false,
-          message: "Your admin account has been deactivated",
-        });
-      }
-
-      next();
-    } catch (error) {
-      console.error("Admin Auth Error:", error.message);
-      return res.status(401).json({
-        success: false,
-        message: "Not authorized as admin",
-      });
-    }
-  }
-
-  if (!token) {
-    return res.status(401).json({
-      success: false,
-      message: "Not authorized, no token provided",
-    });
-  }
-};
-
-/**
- * Check if user has specific role
- * Usage: authorize('admin', 'super_admin')
- */
-const authorize = (...roles) => {
-  return (req, res, next) => {
-    // Check in req.user first (for regular users)
-    if (req.user && !roles.includes(req.user.role)) {
-      return res.status(403).json({
-        success: false,
-        message: `User role '${req.user.role}' is not authorized to access this route`,
-      });
-    }
-
-    // Check in req.admin (for admin users)
-    if (req.admin && !roles.includes(req.admin.role)) {
-      return res.status(403).json({
-        success: false,
-        message: `Admin role '${req.admin.role}' is not authorized to access this route`,
-      });
-    }
-
-    next();
-  };
-};
-
-/**
- * Check if admin has specific permission
- * Usage: checkPermission('manage_users')
- */
-const checkPermission = (permission) => {
-  return (req, res, next) => {
-    if (!req.admin) {
-      return res.status(403).json({
-        success: false,
-        message: "Admin authentication required",
-      });
-    }
-
-    const permissions = req.admin.getPermissions();
-
-    if (!permissions.includes(permission)) {
-      return res.status(403).json({
-        success: false,
-        message: `You don't have permission to ${permission.replace("_", " ")}`,
-      });
-    }
-
-    next();
-  };
-};
-
-/**
- * Optional authentication - doesn't fail if no token
- * Useful for routes that work differently for authenticated vs unauthenticated users
- */
-const optionalAuth = async (req, res, next) => {
-  let token;
-
-  if (
-    req.headers.authorization &&
-    req.headers.authorization.startsWith("Bearer")
-  ) {
-    try {
-      token = req.headers.authorization.split(" ")[1];
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      req.user = await User.findById(decoded.id).select("-otp -otpExpiry");
-    } catch (error) {
-      // Token is invalid but we don't fail, just continue without user
-      console.log("Optional auth - invalid token");
-    }
-  }
-
-  next();
-};
-
-module.exports = {
-  protect,
-  adminProtect,
-  authorize,
-  checkPermission,
-  optionalAuth,
-};
+module.exports = { protect };
