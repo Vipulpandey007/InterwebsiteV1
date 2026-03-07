@@ -251,10 +251,14 @@ const ApplicationForm = () => {
         {/* Header */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
           <div className="flex items-center gap-4 mb-4">
-            <div className="w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center text-white text-2xl font-bold">
-              GIC
+            <div className="w-20 h-20 rounded-full flex items-center justify-center">
+              <img
+                src="/logo.svg"
+                alt="College Logo"
+                className="w-16 h-16 object-contain"
+              />
             </div>
-            <div className="flex-1">
+            <div className="flex-1 text-center">
               <h1 className="text-2xl font-bold text-gray-800">
                 GOSSNER INTERMEDIATE COLLEGE, RANCHI
               </h1>
@@ -263,31 +267,39 @@ const ApplicationForm = () => {
                 Jharkhand
               </p>
               <p className="text-sm text-gray-600">
-                website: www.gcraninter.org
+                Fill the application form carefully
               </p>
             </div>
           </div>
 
           {/* Progress Steps */}
-          <div className="flex justify-between items-center mb-6">
-            {[1, 2, 3, 4, 5, 6].map((step) => (
-              <div key={step} className="flex items-center">
-                <div
-                  className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
-                    currentStep >= step
-                      ? "bg-blue-600 text-white"
-                      : "bg-gray-300 text-gray-600"
-                  }`}
-                >
-                  {step}
-                </div>
-                {step < 6 && (
+          <div className="w-full overflow-x-auto">
+            <div className="flex items-center justify-between min-w-[420px] sm:min-w-full mb-6 px-2">
+              {[1, 2, 3, 4, 5, 6].map((step) => (
+                <div key={step} className="flex items-center flex-shrink-0">
+                  {/* Step Circle */}
                   <div
-                    className={`w-12 h-1 ${currentStep > step ? "bg-blue-600" : "bg-gray-300"}`}
-                  />
-                )}
-              </div>
-            ))}
+                    className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-bold text-sm sm:text-base
+          ${
+            currentStep >= step
+              ? "bg-blue-600 text-white"
+              : "bg-gray-300 text-gray-600"
+          }`}
+                  >
+                    {step}
+                  </div>
+
+                  {/* Step Line */}
+                  {step < 6 && (
+                    <div
+                      className={`w-8 sm:w-12 md:w-16 h-1 ${
+                        currentStep > step ? "bg-blue-600" : "bg-gray-300"
+                      }`}
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
 
           <div className="text-center text-sm text-gray-600">
@@ -348,7 +360,7 @@ const ApplicationForm = () => {
                     required
                   />
                 </div>
-                <div>
+                {/* <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Reference Number (Optional)
                   </label>
@@ -360,7 +372,7 @@ const ApplicationForm = () => {
                     className="input-field"
                     placeholder="If any"
                   />
-                </div>
+                </div> */}
               </div>
             </div>
           )}
