@@ -19,7 +19,9 @@ const LandingPage = () => {
       <nav className="bg-white/10 backdrop-blur-md border-b border-white/20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="text-white font-bold text-xl">College Portal</div>
+            <div className="text-white font-bold text-xl">
+              Gossner Intermediate College
+            </div>
             <div className="flex items-center gap-4">
               {isAuthenticated ? (
                 <button
@@ -54,7 +56,7 @@ const LandingPage = () => {
         <div className="text-center">
           {/* College Name */}
           <h1 className="text-5xl md:text-7xl font-extrabold text-white mb-4 drop-shadow-lg">
-            COLLEGE NAME
+            Gossner Intermediate College, Ranchi
           </h1>
           <p className="text-xl md:text-2xl text-white/90 mb-8">
             Empowering Future Leaders
@@ -98,7 +100,7 @@ const LandingPage = () => {
           </div>
 
           {/* Info Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+          {/* <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
             <div className="bg-white/90 backdrop-blur-sm rounded-xl p-6 shadow-lg hover:shadow-xl transition-shadow">
               <div className="text-4xl mb-4">📚</div>
               <h3 className="text-xl font-bold text-gray-800 mb-2">
@@ -124,7 +126,7 @@ const LandingPage = () => {
               </h3>
               <p className="text-gray-600">Career support & guidance</p>
             </div>
-          </div>
+          </div> */}
 
           {/* Contact Info */}
           <div className="bg-white/90 backdrop-blur-sm rounded-xl p-6 shadow-lg inline-block">

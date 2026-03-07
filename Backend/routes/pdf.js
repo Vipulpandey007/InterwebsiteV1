@@ -1,35 +1,26 @@
 const express = require("express");
 const router = express.Router();
-const {
-  generateAdmitCard,
-  downloadAdmitCard,
-  viewAdmitCard,
-  checkAdmitCardStatus,
-} = require("../controllers/pdfController");
 const { protect } = require("../middleware/authMiddleware");
+const {
+  generatePDF,
+  downloadPDF,
+  getPDFStatus,
+} = require("../controllers/pdfController");
 
-/**
- * All routes are protected - user must be logged in
- */
-
-// @route   POST /api/pdf/generate/:applicationId
-// @desc    Generate admit card PDF
+// @route   POST /api/pdf/generate/:id
+// @desc    Generate PDF admit card
 // @access  Private
-router.post("/generate/:applicationId", protect, generateAdmitCard);
+router.post("/generate/:id", protect, generatePDF);
 
-// @route   GET /api/pdf/download/:applicationId
-// @desc    Download admit card PDF
-// @access  Private
-router.get("/download/:applicationId", protect, downloadAdmitCard);
+// @route   GET /api/pdf/download/:id
+// @desc    Download PDF admit card
+// @access  Public (token in query params)
+// NOTE: This route does NOT use protect middleware because token comes from query params
+router.get("/download/:id", downloadPDF);
 
-// @route   GET /api/pdf/view/:applicationId
-// @desc    View admit card PDF in browser
+// @route   GET /api/pdf/status/:id
+// @desc    Get PDF generation status
 // @access  Private
-router.get("/view/:applicationId", protect, viewAdmitCard);
-
-// @route   GET /api/pdf/status/:applicationId
-// @desc    Check admit card generation status
-// @access  Private
-router.get("/status/:applicationId", protect, checkAdmitCardStatus);
+router.get("/status/:id", protect, getPDFStatus);
 
 module.exports = router;

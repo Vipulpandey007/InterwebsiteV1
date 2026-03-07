@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const { protect } = require("../middleware/authMiddleware");
+const { uploadFields } = require("../config/multerConfig");
 const {
   createApplication,
   getMyApplications,
@@ -10,22 +11,34 @@ const {
   deleteApplication,
 } = require("../controllers/applicationController");
 
-// Create new application
-router.post("/", protect, createApplication);
+// @route   POST /api/applications
+// @desc    Create new application with file uploads
+// @access  Private
+router.post("/", protect, uploadFields, createApplication);
 
-// Get my applications
+// @route   GET /api/applications/my-applications
+// @desc    Get logged in user's applications
+// @access  Private
 router.get("/my-applications", protect, getMyApplications);
 
-// Get application by ID
+// @route   GET /api/applications/:id
+// @desc    Get application by ID
+// @access  Private
 router.get("/:id", protect, getApplicationById);
 
-// Update application
+// @route   PUT /api/applications/:id
+// @desc    Update application
+// @access  Private
 router.put("/:id", protect, updateApplication);
 
-// Submit application
+// @route   POST /api/applications/:id/submit
+// @desc    Submit application
+// @access  Private
 router.post("/:id/submit", protect, submitApplication);
 
-// Delete application
+// @route   DELETE /api/applications/:id
+// @desc    Delete application
+// @access  Private
 router.delete("/:id", protect, deleteApplication);
 
 module.exports = router;

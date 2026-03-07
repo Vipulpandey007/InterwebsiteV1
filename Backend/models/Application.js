@@ -10,9 +10,25 @@ const applicationSchema = new mongoose.Schema(
     applicationNumber: {
       type: String,
       unique: true,
+      required: true,
     },
 
-    // Basic Information
+    // Basic Application Info
+    appliedFor: {
+      type: String,
+      required: [true, "Applied for field is required"],
+      enum: ["Science", "Commerce", "Arts"],
+    },
+    session: {
+      type: String,
+      required: [true, "Session is required"],
+      default: "2026-2027",
+    },
+    referenceNumber: {
+      type: String,
+    },
+
+    // Student Personal Details
     fullName: {
       type: String,
       required: [true, "Full name is required"],
@@ -23,86 +39,143 @@ const applicationSchema = new mongoose.Schema(
       required: [true, "Father's name is required"],
       trim: true,
     },
+    motherName: {
+      type: String,
+      required: [true, "Mother's name is required"],
+      trim: true,
+    },
+    dateOfBirth: {
+      type: Date,
+      required: [true, "Date of birth is required"],
+    },
+    gender: {
+      type: String,
+      required: [true, "Gender is required"],
+      enum: ["Male", "Female", "Other"],
+    },
+    category: {
+      type: String,
+      required: [true, "Category is required"],
+      enum: ["General", "OBC", "SC", "ST", "EWS"],
+    },
+    religion: {
+      type: String,
+      required: [true, "Religion is required"],
+    },
+    contactNo: {
+      type: String,
+      required: [true, "Contact number is required"],
+      match: [/^[0-9]{10}$/, "Please enter a valid 10-digit contact number"],
+    },
+    whatsappNo: {
+      type: String,
+      match: [/^[0-9]{10}$/, "Please enter a valid 10-digit WhatsApp number"],
+    },
+    guardianContactNo: {
+      type: String,
+      required: [true, "Guardian contact number is required"],
+      match: [/^[0-9]{10}$/, "Please enter a valid 10-digit contact number"],
+    },
     email: {
       type: String,
       required: [true, "Email is required"],
       lowercase: true,
-      trim: true,
       match: [/^\S+@\S+\.\S+$/, "Please enter a valid email"],
     },
-    mobile: {
+    aadharCard: {
       type: String,
-      required: [true, "Mobile number is required"],
-      match: [/^[0-9]{10}$/, "Please enter a valid 10-digit mobile number"],
+      required: [true, "Aadhar card number is required"],
+      match: [/^[0-9]{12}$/, "Please enter a valid 12-digit Aadhar number"],
     },
-
-    // Address Information
-    address: {
+    bloodGroup: {
       type: String,
-      required: [true, "Address is required"],
-      trim: true,
+      enum: ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-", ""],
     },
-
-    // Course Selection
-    course: {
+    motherTongue: {
       type: String,
-      required: [true, "Course selection is required"],
-      trim: true,
+      required: [true, "Mother tongue is required"],
     },
-
-    // Academic Information
-    twelfthMarks: {
+    studentHeight: {
       type: Number,
-      required: [true, "12th marks are required"],
-      min: [0, "Marks cannot be negative"],
-      max: [100, "Marks cannot exceed 100"],
+      required: [true, "Student height is required"],
+    },
+    studentWeight: {
+      type: Number,
+      required: [true, "Student weight is required"],
     },
 
-    // Document Uploads (optional paths)
+    // Address Details
+    presentAddress: {
+      type: String,
+      required: [true, "Present address is required"],
+    },
+    permanentAddress: {
+      type: String,
+      required: [true, "Permanent address is required"],
+    },
+    aaparId: {
+      type: String,
+    },
+    nationality: {
+      type: String,
+      required: [true, "Nationality is required"],
+      default: "Indian",
+    },
+
+    // Educational Qualification
+    schoolName: {
+      type: String,
+      required: [true, "School name is required"],
+    },
+    board: {
+      type: String,
+      required: [true, "Board is required"],
+      enum: ["CBSE", "ICSE", "JAC", "Other"],
+    },
+    subject: {
+      type: String,
+      required: [true, "Subject is required"],
+    },
+    marksObtained: {
+      type: Number,
+      required: [true, "Marks obtained is required"],
+      min: 0,
+    },
+    totalMarks: {
+      type: Number,
+      required: [true, "Total marks is required"],
+      min: 0,
+    },
+    percentage: {
+      type: Number,
+      min: 0,
+      max: 100,
+    },
+    grade: {
+      type: String,
+    },
+    yearOfPassing: {
+      type: Number,
+      required: [true, "Year of passing is required"],
+      min: 2000,
+      max: 2030,
+    },
+    division: {
+      type: String,
+      enum: ["First", "Second", "Third", ""],
+    },
+
+    // Documents (file paths)
     documents: {
-      photograph: {
-        type: String,
-        default: null,
-      },
-      marksheet: {
-        type: String,
-        default: null,
-      },
-      idProof: {
-        type: String,
-        default: null,
-      },
-    },
-
-    // Payment Information
-    paymentStatus: {
-      type: String,
-      enum: ["pending", "completed", "failed", "refunded"],
-      default: "pending",
-    },
-    transactionId: {
-      type: String,
-      default: null,
-    },
-    razorpayOrderId: {
-      type: String,
-      default: null,
-    },
-    razorpayPaymentId: {
-      type: String,
-      default: null,
-    },
-    razorpaySignature: {
-      type: String,
-      default: null,
-    },
-    amount: {
-      type: Number,
-      default: 500, // Application fee
-    },
-    paymentDate: {
-      type: Date,
-      default: null,
+      tenthMarksheet: String,
+      tenthAdmitCard: String,
+      transferCertificate: String,
+      characterCertificate: String,
+      migration: String,
+      casteCertificate: String,
+      bplCertificate: String,
+      aadharCardDoc: String,
+      studentPhoto: String,
     },
 
     // Application Status
@@ -112,35 +185,42 @@ const applicationSchema = new mongoose.Schema(
       default: "draft",
     },
 
-    // Submission timestamp
-    submittedAt: {
+    // Payment Details
+    amount: {
+      type: Number,
+      default: 1000,
+    },
+    paymentStatus: {
+      type: String,
+      enum: ["pending", "completed", "failed"],
+      default: "pending",
+    },
+    transactionId: {
+      type: String,
+    },
+    paymentDate: {
       type: Date,
-      default: null,
+    },
+    razorpayOrderId: {
+      type: String,
+    },
+    razorpayPaymentId: {
+      type: String,
+    },
+    razorpaySignature: {
+      type: String,
     },
 
-    // PDF Generation
+    // Admit Card
     admitCardGenerated: {
       type: Boolean,
       default: false,
     },
-    admitCardPath: {
-      type: String,
-      default: null,
-    },
 
-    // Admin Review
-    adminNotes: {
-      type: String,
-      default: null,
-    },
-    reviewedBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Admin",
-      default: null,
-    },
-    reviewedAt: {
-      type: Date,
-      default: null,
+    // Disclaimer Agreement
+    disclaimerAgreed: {
+      type: Boolean,
+      default: false,
     },
   },
   {
@@ -148,40 +228,33 @@ const applicationSchema = new mongoose.Schema(
   },
 );
 
-// Generate unique application number before saving
-applicationSchema.pre("save", async function (next) {
-  if (this.isNew && !this.applicationNumber) {
-    const year = new Date().getFullYear();
-    const count = await mongoose.model("Application").countDocuments();
-    this.applicationNumber = `APP${year}${String(count + 1).padStart(6, "0")}`;
+// Auto-calculate percentage before save
+applicationSchema.pre("save", function (next) {
+  if (this.marksObtained && this.totalMarks) {
+    this.percentage = parseFloat(
+      ((this.marksObtained / this.totalMarks) * 100).toFixed(2),
+    );
   }
   next();
 });
 
-// Method to mark application as submitted
-applicationSchema.methods.markAsSubmitted = function () {
-  this.status = "submitted";
-  this.submittedAt = new Date();
-};
-
-// Method to update payment status
-applicationSchema.methods.updatePayment = function (paymentData) {
-  this.paymentStatus = "completed";
-  this.transactionId = paymentData.transactionId;
-  this.razorpayPaymentId = paymentData.razorpayPaymentId;
-  this.razorpayOrderId = paymentData.razorpayOrderId;
-  this.razorpaySignature = paymentData.razorpaySignature;
-  this.paymentDate = new Date();
-};
-
-// Indexes for faster queries
-applicationSchema.index({ userId: 1 });
-applicationSchema.index({ applicationNumber: 1 });
-applicationSchema.index({ paymentStatus: 1 });
-applicationSchema.index({ status: 1 });
-applicationSchema.index({ email: 1 });
-applicationSchema.index({ mobile: 1 });
-applicationSchema.index({ createdAt: -1 });
+// Virtual for age calculation
+applicationSchema.virtual("age").get(function () {
+  if (this.dateOfBirth) {
+    const today = new Date();
+    const birthDate = new Date(this.dateOfBirth);
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (
+      monthDiff < 0 ||
+      (monthDiff === 0 && today.getDate() < birthDate.getDate())
+    ) {
+      age--;
+    }
+    return age;
+  }
+  return null;
+});
 
 module.exports =
   mongoose.models.Application ||

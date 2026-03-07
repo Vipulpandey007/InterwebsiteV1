@@ -118,12 +118,12 @@ const Dashboard = () => {
     try {
       const response = await pdfAPI.generate(application._id);
       if (response.data.success) {
-        toast.success("Admit card generated!");
+        toast.success("Application Form generated!");
         fetchApplication();
       }
     } catch (error) {
       toast.error(
-        error.response?.data?.message || "Failed to generate admit card",
+        error.response?.data?.message || "Failed to generate application form",
       );
     }
   };
@@ -165,7 +165,7 @@ const Dashboard = () => {
               <div className="text-right hidden sm:block">
                 <p className="text-sm text-gray-600">Welcome</p>
                 <p className="text-sm font-semibold text-gray-800">
-                  {user?.mobile}
+                  {user?.name}
                 </p>
               </div>
               <button onClick={handleLogout} className="btn-secondary">
@@ -221,13 +221,13 @@ const Dashboard = () => {
                 <div className="bg-gray-50 rounded-lg p-4">
                   <p className="text-sm text-gray-600 mb-1">Course</p>
                   <p className="text-lg font-semibold text-gray-800">
-                    {application.course}
+                    {application.appliedFor}
                   </p>
                 </div>
                 <div className="bg-gray-50 rounded-lg p-4">
                   <p className="text-sm text-gray-600 mb-1">12th Marks</p>
                   <p className="text-lg font-semibold text-gray-800">
-                    {application.twelfthMarks}%
+                    {application.marksObtained}
                   </p>
                 </div>
                 <div className="bg-gray-50 rounded-lg p-4">
@@ -327,7 +327,7 @@ const Dashboard = () => {
                     </div>
                   )}
 
-                {/* Step 3: Download Admit Card - PDF BUTTONS */}
+                {/* Step 3: Download Application Form - PDF BUTTONS */}
                 {application.paymentStatus === "completed" && (
                   <div className="border-2 border-purple-200 bg-purple-50 rounded-lg p-6">
                     <div className="flex items-start gap-4">
@@ -336,11 +336,11 @@ const Dashboard = () => {
                       </div>
                       <div className="flex-1">
                         <h3 className="text-lg font-bold text-gray-800 mb-2">
-                          Download Admit Card
+                          Download Application Form
                         </h3>
                         <p className="text-gray-600 mb-4">
                           Your payment is completed. Generate and download your
-                          admit card
+                          application form
                         </p>
                         <div className="flex flex-wrap gap-3">
                           {application.admitCardGenerated ? (
@@ -349,7 +349,7 @@ const Dashboard = () => {
                                 onClick={handleDownloadPDF}
                                 className="btn-primary"
                               >
-                                Download Admit Card
+                                Download Application Form
                               </button>
                               <button
                                 onClick={handleGeneratePDF}

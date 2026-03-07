@@ -108,7 +108,7 @@ const createOrder = async (req, res) => {
 };
 
 /**
- * @desc    Verify Razorpay payment
+ * @desc    Verify payment
  * @route   POST /api/payment/verify
  * @access  Private
  */
@@ -121,112 +121,89 @@ const verifyPayment = async (req, res) => {
       applicationId,
     } = req.body;
 
-    // Validate required fields
-    if (
-      !razorpay_order_id ||
-      !razorpay_payment_id ||
-      !razorpay_signature ||
-      !applicationId
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "Missing required payment verification parameters",
-      });
-    }
+    console.log("\n╔════════════════════════════════════════╗");
+    console.log("║     VERIFY PAYMENT                     ║");
+    console.log("╚════════════════════════════════════════╝");
+    console.log("Order ID:", razorpay_order_id);
+    console.log("Payment ID:", razorpay_payment_id);
+    console.log("Application ID:", applicationId);
 
-    // Find application
+    // Get application
     const application = await Application.findById(applicationId);
 
     if (!application) {
+      console.error("❌ Application not found");
       return res.status(404).json({
         success: false,
         message: "Application not found",
       });
     }
 
-    // Check ownership
+    // Check if application belongs to user
     if (application.userId.toString() !== req.user.id) {
+      console.error("❌ Unauthorized access");
       return res.status(403).json({
         success: false,
-        message:
-          "You are not authorized to verify payment for this application",
-      });
-    }
-
-    // Verify order ID matches
-    if (application.razorpayOrderId !== razorpay_order_id) {
-      return res.status(400).json({
-        success: false,
-        message: "Order ID mismatch",
-      });
-    }
-
-    // Check if payment is already verified
-    if (application.paymentStatus === "completed") {
-      return res.status(400).json({
-        success: false,
-        message: "Payment already verified for this application",
+        message: "Not authorized",
       });
     }
 
     // Verify signature
-    const isValidSignature = verifyRazorpaySignature(
-      razorpay_order_id,
-      razorpay_payment_id,
-      razorpay_signature,
-    );
+    const sign = razorpay_order_id + "|" + razorpay_payment_id;
+    const expectedSign = crypto
+      .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+      .update(sign.toString())
+      .digest("hex");
 
-    if (!isValidSignature) {
-      // Mark payment as failed
+    console.log("Expected signature:", expectedSign);
+    console.log("Received signature:", razorpay_signature);
+
+    if (razorpay_signature === expectedSign) {
+      console.log("✅ Signature verified successfully");
+
+      // Update application payment details
+      application.paymentStatus = "completed";
+      application.razorpayPaymentId = razorpay_payment_id;
+      application.razorpaySignature = razorpay_signature;
+      application.transactionId = razorpay_payment_id;
+      application.paymentDate = new Date();
+
+      await application.save();
+
+      console.log("✅ Application payment updated successfully");
+
+      res.status(200).json({
+        success: true,
+        message: "Payment verified successfully",
+        data: {
+          application,
+        },
+      });
+    } else {
+      console.error("❌ Invalid signature");
+
+      // Update payment status to failed
       application.paymentStatus = "failed";
       await application.save();
 
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
-        message: "Payment verification failed. Invalid signature.",
+        message: "Invalid payment signature",
       });
     }
-
-    // Fetch payment details from Razorpay for additional verification
-    let paymentDetails;
-    try {
-      const result = await fetchPaymentDetails(razorpay_payment_id);
-      paymentDetails = result.payment;
-    } catch (error) {
-      console.error("Error fetching payment details:", error);
-    }
-
-    // Update application with payment details
-    application.updatePayment({
-      transactionId: razorpay_payment_id,
-      razorpayPaymentId: razorpay_payment_id,
-      razorpayOrderId: razorpay_order_id,
-      razorpaySignature: razorpay_signature,
-    });
-
-    await application.save();
-
-    res.status(200).json({
-      success: true,
-      message: "Payment verified successfully",
-      data: {
-        applicationId: application._id,
-        applicationNumber: application.applicationNumber,
-        transactionId: razorpay_payment_id,
-        paymentStatus: application.paymentStatus,
-        paymentDate: application.paymentDate,
-        amount: application.amount,
-      },
-    });
   } catch (error) {
     console.error("Verify Payment Error:", error);
+    console.error("Error message:", error.message);
+    console.error("Stack:", error.stack);
+
     res.status(500).json({
       success: false,
-      message: "Failed to verify payment. Please contact support.",
+      message: "Failed to verify payment",
+      error:
+        process.env.NODE_ENV === "development" ? error.message : "Server error",
     });
   }
 };
-
 /**
  * @desc    Get payment status for an application
  * @route   GET /api/payment/status/:applicationId
