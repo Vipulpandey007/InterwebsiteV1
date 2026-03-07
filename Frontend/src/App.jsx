@@ -12,6 +12,8 @@ import SignupPage from "./pages/SignupPage";
 import LoginPage from "./pages/LoginPage";
 import Dashboard from "./pages/Dashboard";
 import ApplicationForm from "./pages/ApplicationForm";
+import AdminLogin from "./pages/AdminLogin";
+import AdminDashboard from "./pages/AdminDashboard";
 
 function App() {
   return (
@@ -22,6 +24,8 @@ function App() {
           <Route path="/" element={<LandingPage />} />
           <Route path="/signup" element={<SignupPage />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/admin/login" element={<AdminLogin />} />
+          <Route path="/admin/dashboard" element={<AdminDashboard />} />
 
           {/* Protected Routes */}
           <Route

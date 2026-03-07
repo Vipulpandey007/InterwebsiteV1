@@ -1,106 +1,48 @@
 const express = require("express");
 const router = express.Router();
-
-// Import controllers
+const { protect, adminOnly } = require("../middleware/authMiddleware");
 const {
   adminLogin,
-  getAdminProfile,
-  updateAdminProfile,
-  changeAdminPassword,
-  adminLogout,
-} = require("../controllers/adminAuthController");
+  getStats,
+  getAllApplications,
+  getApplicationById,
+  updateApplicationStatus,
+  createAdmin,
+} = require("../controllers/adminController");
 
-const {
-  getDashboardStats,
-  getStudentsList,
-  getStudentDetails,
-  getPaymentStats,
-  exportStudentsData,
-} = require("../controllers/adminDashboardController");
-
-// Import middleware
-const {
-  adminProtect,
-  checkPermission,
-} = require("../middleware/authMiddleware");
-
-// ==================== AUTHENTICATION ROUTES ====================
-
-// @route   POST /api/admin/auth/login
+// @route   POST /api/admin/login
 // @desc    Admin login
 // @access  Public
-router.post("/auth/login", adminLogin);
+router.post("/login", adminLogin);
 
-// @route   GET /api/admin/auth/me
-// @desc    Get admin profile
-// @access  Private (Admin)
-router.get("/auth/me", adminProtect, getAdminProfile);
+// @route   POST /api/admin/create
+// @desc    Create admin user (for initial setup)
+// @access  Public (should be protected in production)
+router.post("/create", createAdmin);
 
-// @route   PUT /api/admin/auth/profile
-// @desc    Update admin profile
-// @access  Private (Admin)
-router.put("/auth/profile", adminProtect, updateAdminProfile);
-
-// @route   PUT /api/admin/auth/change-password
-// @desc    Change admin password
-// @access  Private (Admin)
-router.put("/auth/change-password", adminProtect, changeAdminPassword);
-
-// @route   POST /api/admin/auth/logout
-// @desc    Admin logout
-// @access  Private (Admin)
-router.post("/auth/logout", adminProtect, adminLogout);
-
-// ==================== DASHBOARD ROUTES ====================
-
-// @route   GET /api/admin/dashboard/stats
+// @route   GET /api/admin/stats
 // @desc    Get dashboard statistics
-// @access  Private (Admin with view_reports permission)
-router.get(
-  "/dashboard/stats",
-  adminProtect,
-  checkPermission("view_reports"),
-  getDashboardStats,
-);
+// @access  Private (Admin only)
+router.get("/stats", protect, adminOnly, getStats);
 
-// @route   GET /api/admin/dashboard/students
-// @desc    Get list of all students/applications
-// @access  Private (Admin with view_applications permission)
-router.get(
-  "/dashboard/students",
-  adminProtect,
-  checkPermission("view_applications"),
-  getStudentsList,
-);
+// @route   GET /api/admin/applications
+// @desc    Get all applications
+// @access  Private (Admin only)
+router.get("/applications", protect, adminOnly, getAllApplications);
 
-// @route   GET /api/admin/dashboard/students/:id
-// @desc    Get single student/application details
-// @access  Private (Admin with view_applications permission)
-router.get(
-  "/dashboard/students/:id",
-  adminProtect,
-  checkPermission("view_applications"),
-  getStudentDetails,
-);
+// @route   GET /api/admin/applications/:id
+// @desc    Get application by ID
+// @access  Private (Admin only)
+router.get("/applications/:id", protect, adminOnly, getApplicationById);
 
-// @route   GET /api/admin/dashboard/payments
-// @desc    Get payment statistics
-// @access  Private (Admin with view_reports permission)
-router.get(
-  "/dashboard/payments",
-  adminProtect,
-  checkPermission("view_reports"),
-  getPaymentStats,
-);
-
-// @route   GET /api/admin/dashboard/export
-// @desc    Export students data to CSV
-// @access  Private (Admin with view_reports permission)
-router.get(
-  "/dashboard/export",
-  adminProtect,
-  checkPermission("view_reports"),
-  exportStudentsData,
+// @route   PUT /api/admin/applications/:id/status
+// @desc    Update application status
+// @access  Private (Admin only)
+router.put(
+  "/applications/:id/status",
+  protect,
+  adminOnly,
+  updateApplicationStatus,
 );
 
 module.exports = router;

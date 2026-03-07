@@ -8,31 +8,63 @@ const api = axios.create({
   },
 });
 
-// Request interceptor
+// Request interceptor - CRITICAL: Must add Authorization header
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem("token");
+    console.log("🔍 API Request:", config.method?.toUpperCase(), config.url);
 
-    if (token) {
+    // Get tokens from localStorage
+    const token = localStorage.getItem("token");
+    const adminToken = localStorage.getItem("adminToken");
+
+    console.log("📦 Tokens available:", {
+      userToken: token ? "EXISTS" : "MISSING",
+      adminToken: adminToken ? "EXISTS" : "MISSING",
+    });
+
+    // Use admin token for admin routes, otherwise use user token
+    if (config.url.startsWith("/admin") && adminToken) {
+      config.headers.Authorization = `Bearer ${adminToken}`;
+      console.log("✅ Added admin token to request");
+    } else if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+      console.log("✅ Added user token to request");
+    } else {
+      console.log("⚠️  No token added to request");
     }
 
     return config;
   },
   (error) => {
+    console.error("❌ Request interceptor error:", error);
     return Promise.reject(error);
   },
 );
 
 // Response interceptor
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    console.log("✅ API Response:", response.config.url, response.status);
+    return response;
+  },
   (error) => {
+    console.error("❌ API Error:", error.config?.url, error.response?.status);
+
     if (error.response?.status === 401) {
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
-      window.location.href = "/login";
-      toast.error("Session expired. Please login again.");
+      // Check if admin or user route
+      if (error.config.url.startsWith("/admin")) {
+        console.log("🔒 Admin session expired, redirecting to admin login");
+        localStorage.removeItem("adminToken");
+        localStorage.removeItem("admin");
+        window.location.href = "/admin/login";
+        toast.error("Admin session expired");
+      } else {
+        console.log("🔒 User session expired, redirecting to user login");
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        window.location.href = "/login";
+        toast.error("Session expired");
+      }
     }
     return Promise.reject(error);
   },
@@ -48,25 +80,26 @@ export const authAPI = {
   resendOTP: (mobile) => api.post("/auth/resend-otp", { mobile }),
   getProfile: () => api.get("/auth/me"),
   logout: () => api.post("/auth/logout"),
+
+  // Admin auth
+  adminLogin: (data) => api.post("/admin/login", data),
 };
 
 // ==================== APPLICATION APIs ====================
 export const applicationAPI = {
-  // Create application WITHOUT files (old method)
   create: (data) => api.post("/applications", data),
-
-  // Create application WITH files (new method)
   createWithFiles: (formData) => {
-    console.log("Sending application with files...");
+    const token = localStorage.getItem("token");
+    console.log("📤 Uploading files with token:", token ? "EXISTS" : "MISSING");
+
     return axios.post("/api/applications", formData, {
       headers: {
         "Content-Type": "multipart/form-data",
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
+        Authorization: `Bearer ${token}`,
       },
-      timeout: 30000, // 30 seconds for file upload
+      timeout: 30000,
     });
   },
-
   getMyApplications: () => api.get("/applications/my-applications"),
   getById: (id) => api.get(`/applications/${id}`),
   update: (id, data) => api.put(`/applications/${id}`, data),
@@ -90,9 +123,29 @@ export const pdfAPI = {
     const token = localStorage.getItem("token");
     return `/api/pdf/download/${applicationId}?token=${token}`;
   },
-  viewURL: (applicationId) => {
-    const token = localStorage.getItem("token");
-    return `/api/pdf/view/${applicationId}?token=${token}`;
+};
+
+// ==================== ADMIN APIs ====================
+export const adminAPI = {
+  // Auth
+  login: (data) => api.post("/admin/login", data),
+  createAdmin: (data) => api.post("/admin/create", data),
+
+  // Dashboard
+  getStats: () => {
+    console.log("📊 Fetching admin stats...");
+    return api.get("/admin/stats");
+  },
+
+  // Applications
+  getAllApplications: () => {
+    console.log("📋 Fetching all applications...");
+    return api.get("/admin/applications");
+  },
+  getApplicationById: (id) => api.get(`/admin/applications/${id}`),
+  updateApplicationStatus: (id, status) => {
+    console.log("🔄 Updating application status:", id, status);
+    return api.put(`/admin/applications/${id}/status`, { status });
   },
 };
 
