@@ -1,51 +1,103 @@
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/geist";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* Theme Variables */
 @layer base {
+  :root {
+    --background: oklch(1 0 0);
+    --foreground: oklch(0.145 0 0);
+
+    --card: oklch(1 0 0);
+    --card-foreground: oklch(0.145 0 0);
+
+    --popover: oklch(1 0 0);
+    --popover-foreground: oklch(0.145 0 0);
+
+    --primary: oklch(0.205 0 0);
+    --primary-foreground: oklch(0.985 0 0);
+
+    --secondary: oklch(0.97 0 0);
+    --secondary-foreground: oklch(0.205 0 0);
+
+    --muted: oklch(0.97 0 0);
+    --muted-foreground: oklch(0.556 0 0);
+
+    --accent: oklch(0.97 0 0);
+    --accent-foreground: oklch(0.205 0 0);
+
+    --destructive: oklch(0.58 0.22 27);
+
+    --border: oklch(0.922 0 0);
+    --input: oklch(0.922 0 0);
+    --ring: oklch(0.708 0 0);
+
+    --radius: 0.625rem;
+
+    --font-sans: "Geist Variable", sans-serif;
+  }
+
+  .dark {
+    --background: oklch(0.145 0 0);
+    --foreground: oklch(0.985 0 0);
+
+    --card: oklch(0.205 0 0);
+    --card-foreground: oklch(0.985 0 0);
+
+    --popover: oklch(0.205 0 0);
+    --popover-foreground: oklch(0.985 0 0);
+
+    --primary: oklch(0.87 0 0);
+    --primary-foreground: oklch(0.205 0 0);
+
+    --secondary: oklch(0.269 0 0);
+    --secondary-foreground: oklch(0.985 0 0);
+
+    --muted: oklch(0.269 0 0);
+    --muted-foreground: oklch(0.708 0 0);
+
+    --accent: oklch(0.371 0 0);
+    --accent-foreground: oklch(0.985 0 0);
+
+    --destructive: oklch(0.704 0.191 22.216);
+
+    --border: oklch(1 0 0 / 10%);
+    --input: oklch(1 0 0 / 15%);
+    --ring: oklch(0.556 0 0);
+  }
+
+  * {
+    @apply border-border;
+  }
+
   body {
-    @apply bg-gray-50 text-gray-900;
+    @apply bg-background text-foreground font-sans;
   }
 }
 
+/* Custom Components */
 @layer components {
   .btn-primary {
-    @apply bg-primary-500 hover:bg-primary-600 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-primary-500;
+    @apply bg-primary text-primary-foreground hover:opacity-90 px-6 py-3 rounded-lg font-semibold transition shadow-md;
   }
 
   .btn-secondary {
-    @apply bg-gray-600 hover:bg-gray-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply bg-secondary text-secondary-foreground hover:opacity-90 px-6 py-3 rounded-lg font-semibold transition;
   }
 
   .btn-outline {
-    @apply border-2 border-primary-500 text-primary-500 hover:bg-primary-500 hover:text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200;
+    @apply border border-primary text-primary hover:bg-primary hover:text-primary-foreground px-6 py-3 rounded-lg transition;
   }
 
   .input-field {
-    @apply w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-primary-500 focus:outline-none transition-colors duration-200 disabled:bg-gray-100 disabled:cursor-not-allowed;
+    @apply w-full px-4 py-3 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring transition;
   }
 
   .card {
-    @apply bg-white rounded-xl shadow-lg p-6;
-  }
-
-  .badge-draft {
-    @apply inline-block px-3 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800;
-  }
-
-  .badge-submitted {
-    @apply inline-block px-3 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800;
-  }
-
-  .badge-pending {
-    @apply inline-block px-3 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800;
-  }
-
-  .badge-completed {
-    @apply inline-block px-3 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800;
-  }
-
-  .badge-failed {
-    @apply inline-block px-3 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800;
+    @apply bg-card text-card-foreground p-6 rounded-xl shadow-lg;
   }
 }

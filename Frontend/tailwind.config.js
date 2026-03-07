@@ -1,23 +1,61 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-  content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
+  darkMode: ["class"],
+
+  content: ["./index.html", "./src/**/*.{js,jsx,ts,tsx}"],
+
   theme: {
     extend: {
       colors: {
+        background: "var(--background)",
+        foreground: "var(--foreground)",
+
+        card: "var(--card)",
+        "card-foreground": "var(--card-foreground)",
+
+        popover: "var(--popover)",
+        "popover-foreground": "var(--popover-foreground)",
+
         primary: {
-          50: "#e6f2ff",
-          100: "#b3d9ff",
-          200: "#80c0ff",
-          300: "#4da7ff",
-          400: "#1a8eff",
-          500: "#3399cc",
-          600: "#2670a3",
-          700: "#1a4d7a",
-          800: "#0d2a51",
-          900: "#000728",
+          DEFAULT: "var(--primary)",
+          foreground: "var(--primary-foreground)",
         },
+
+        secondary: {
+          DEFAULT: "var(--secondary)",
+          foreground: "var(--secondary-foreground)",
+        },
+
+        muted: {
+          DEFAULT: "var(--muted)",
+          foreground: "var(--muted-foreground)",
+        },
+
+        accent: {
+          DEFAULT: "var(--accent)",
+          foreground: "var(--accent-foreground)",
+        },
+
+        destructive: {
+          DEFAULT: "var(--destructive)",
+        },
+
+        border: "var(--border)",
+        input: "var(--input)",
+        ring: "var(--ring)",
+      },
+
+      borderRadius: {
+        lg: "var(--radius)",
+        md: "calc(var(--radius) - 2px)",
+        sm: "calc(var(--radius) - 4px)",
+      },
+
+      fontFamily: {
+        sans: ["var(--font-sans)"],
       },
     },
   },
+
   plugins: [],
 };
