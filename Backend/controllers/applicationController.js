@@ -33,31 +33,33 @@ const createApplication = async (req, res) => {
     const documents = {};
     if (req.files) {
       if (req.files.studentPhoto && req.files.studentPhoto[0]) {
-        documents.studentPhoto = req.files.studentPhoto[0].path;
+        documents.studentPhoto = req.files.studentPhoto[0].filename;
       }
       if (req.files.tenthMarksheet && req.files.tenthMarksheet[0]) {
-        documents.tenthMarksheet = req.files.tenthMarksheet[0].path;
+        documents.tenthMarksheet = req.files.tenthMarksheet[0].filename;
       }
       if (req.files.tenthAdmitCard && req.files.tenthAdmitCard[0]) {
-        documents.tenthAdmitCard = req.files.tenthAdmitCard[0].path;
+        documents.tenthAdmitCard = req.files.tenthAdmitCard[0].filename;
       }
       if (req.files.transferCertificate && req.files.transferCertificate[0]) {
-        documents.transferCertificate = req.files.transferCertificate[0].path;
+        documents.transferCertificate =
+          req.files.transferCertificate[0].filename;
       }
       if (req.files.characterCertificate && req.files.characterCertificate[0]) {
-        documents.characterCertificate = req.files.characterCertificate[0].path;
+        documents.characterCertificate =
+          req.files.characterCertificate[0].filename;
       }
       if (req.files.migration && req.files.migration[0]) {
-        documents.migration = req.files.migration[0].path;
+        documents.migration = req.files.migration[0].filename;
       }
       if (req.files.casteCertificate && req.files.casteCertificate[0]) {
-        documents.casteCertificate = req.files.casteCertificate[0].path;
+        documents.casteCertificate = req.files.casteCertificate[0].filename;
       }
       if (req.files.bplCertificate && req.files.bplCertificate[0]) {
-        documents.bplCertificate = req.files.bplCertificate[0].path;
+        documents.bplCertificate = req.files.bplCertificate[0].filename;
       }
       if (req.files.aadharCardDoc && req.files.aadharCardDoc[0]) {
-        documents.aadharCardDoc = req.files.aadharCardDoc[0].path;
+        documents.aadharCardDoc = req.files.aadharCardDoc[0].filename;
       }
     }
 

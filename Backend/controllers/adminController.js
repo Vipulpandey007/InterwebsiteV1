@@ -199,6 +199,90 @@ const getApplicationById = async (req, res) => {
 };
 
 /**
+ * @desc    Update application fields (admin edit)
+ * @route   PUT /api/admin/applications/:id
+ * @access  Private (Admin only)
+ */
+const updateApplication = async (req, res) => {
+  try {
+    const Application = require("../models/Application");
+
+    console.log("\n╔════════════════════════════════════════╗");
+    console.log("║     ADMIN UPDATE APPLICATION           ║");
+    console.log("╚════════════════════════════════════════╝");
+    console.log("Application ID:", req.params.id);
+
+    const application = await Application.findById(req.params.id);
+
+    if (!application) {
+      return res.status(404).json({
+        success: false,
+        message: "Application not found",
+      });
+    }
+
+    // Fields admin is allowed to edit (exclude payment, documents, status)
+    const allowedFields = [
+      "appliedFor",
+      "session",
+      "referenceNumber",
+      "fullName",
+      "fatherName",
+      "motherName",
+      "dateOfBirth",
+      "gender",
+      "category",
+      "religion",
+      "motherTongue",
+      "bloodGroup",
+      "studentHeight",
+      "studentWeight",
+      "nationality",
+      "aaparId",
+      "contactNo",
+      "whatsappNo",
+      "guardianContactNo",
+      "email",
+      "aadharCard",
+      "presentAddress",
+      "permanentAddress",
+      "schoolName",
+      "board",
+      "subject",
+      "yearOfPassing",
+      "marksObtained",
+      "totalMarks",
+      "grade",
+      "division",
+    ];
+
+    allowedFields.forEach((field) => {
+      if (req.body[field] !== undefined) {
+        application[field] = req.body[field];
+      }
+    });
+
+    await application.save();
+
+    console.log("✅ Application updated by admin");
+
+    res.status(200).json({
+      success: true,
+      message: "Application updated successfully",
+      data: { application },
+    });
+  } catch (error) {
+    console.error("Admin Update Application Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update application",
+      error:
+        process.env.NODE_ENV === "development" ? error.message : "Server error",
+    });
+  }
+};
+
+/**
  * @desc    Update application status
  * @route   PUT /api/admin/applications/:id/status
  * @access  Private (Admin only)
@@ -323,6 +407,7 @@ module.exports = {
   getStats,
   getAllApplications,
   getApplicationById,
+  updateApplication,
   updateApplicationStatus,
   createAdmin,
 };

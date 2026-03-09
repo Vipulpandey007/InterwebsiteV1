@@ -3,6 +3,13 @@ import { useNavigate } from "react-router-dom";
 import { applicationAPI } from "../services/api";
 import toast from "react-hot-toast";
 
+// Review step components
+import ReviewBasicInfo from "../components/review/ReviewBasicInfo";
+import ReviewPersonalDetails from "../components/review/ReviewPersonalDetails";
+import ReviewAddressDetails from "../components/review/ReviewAddressDetails";
+import ReviewAcademicDetails from "../components/review/ReviewAcademicDetails";
+import ReviewDocuments from "../components/review/ReviewDocuments";
+
 const ApplicationForm = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -245,6 +252,15 @@ const ApplicationForm = () => {
     }
   };
 
+  const STEP_LABELS = [
+    "Basic Info",
+    "Personal",
+    "Address",
+    "Education",
+    "Documents",
+    "Review",
+  ];
+
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-4xl mx-auto px-4">
@@ -274,27 +290,37 @@ const ApplicationForm = () => {
 
           {/* Progress Steps */}
           <div className="w-full overflow-x-auto">
-            <div className="flex items-center justify-between min-w-[420px] sm:min-w-full mb-6 px-2">
+            <div className="flex items-center justify-between min-w-[420px] sm:min-w-full mb-4 px-2">
               {[1, 2, 3, 4, 5, 6].map((step) => (
                 <div key={step} className="flex items-center flex-shrink-0">
-                  {/* Step Circle */}
                   <div
-                    className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-bold text-sm sm:text-base
-          ${
-            currentStep >= step
-              ? "bg-blue-600 text-white"
-              : "bg-gray-300 text-gray-600"
-          }`}
+                    className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-bold text-sm sm:text-base ${
+                      currentStep >= step
+                        ? "bg-blue-600 text-white"
+                        : "bg-gray-300 text-gray-600"
+                    }`}
                   >
-                    {step}
+                    {currentStep > step ? (
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M5 13l4 4L19 7"
+                        />
+                      </svg>
+                    ) : (
+                      step
+                    )}
                   </div>
-
-                  {/* Step Line */}
                   {step < 6 && (
                     <div
-                      className={`w-8 sm:w-12 md:w-16 h-1 ${
-                        currentStep > step ? "bg-blue-600" : "bg-gray-300"
-                      }`}
+                      className={`w-8 sm:w-12 md:w-16 h-1 ${currentStep > step ? "bg-blue-600" : "bg-gray-300"}`}
                     />
                   )}
                 </div>
@@ -302,19 +328,8 @@ const ApplicationForm = () => {
             </div>
           </div>
 
-          <div className="text-center text-sm text-gray-600">
-            Step {currentStep} of 6:{" "}
-            {currentStep === 1
-              ? "Basic Information"
-              : currentStep === 2
-                ? "Personal Details"
-                : currentStep === 3
-                  ? "Address Details"
-                  : currentStep === 4
-                    ? "Educational Qualification"
-                    : currentStep === 5
-                      ? "Upload Documents"
-                      : "Review & Submit"}
+          <div className="text-center text-sm font-medium text-blue-700">
+            Step {currentStep} of 6: {STEP_LABELS[currentStep - 1]}
           </div>
         </div>
 
@@ -360,19 +375,6 @@ const ApplicationForm = () => {
                     required
                   />
                 </div>
-                {/* <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Reference Number (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    name="referenceNumber"
-                    value={formData.referenceNumber}
-                    onChange={handleChange}
-                    className="input-field"
-                    placeholder="If any"
-                  />
-                </div> */}
               </div>
             </div>
           )}
@@ -592,14 +594,13 @@ const ApplicationForm = () => {
                     className="input-field"
                   >
                     <option value="">Select Blood Group</option>
-                    <option value="A+">A+</option>
-                    <option value="A-">A-</option>
-                    <option value="B+">B+</option>
-                    <option value="B-">B-</option>
-                    <option value="AB+">AB+</option>
-                    <option value="AB-">AB-</option>
-                    <option value="O+">O+</option>
-                    <option value="O-">O-</option>
+                    {["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"].map(
+                      (bg) => (
+                        <option key={bg} value={bg}>
+                          {bg}
+                        </option>
+                      ),
+                    )}
                   </select>
                 </div>
                 <div>
@@ -617,8 +618,7 @@ const ApplicationForm = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Student Height (in cm){" "}
-                    <span className="text-red-500">*</span>
+                    Height (cm) <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="number"
@@ -632,8 +632,7 @@ const ApplicationForm = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Student Weight (in kg){" "}
-                    <span className="text-red-500">*</span>
+                    Weight (kg) <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="number"
@@ -1023,75 +1022,30 @@ const ApplicationForm = () => {
             </div>
           )}
 
-          {/* Step 6: Review & Submit */}
+          {/* ─────────────────────────────────────────────────────────────
+              Step 6: Review & Submit  — now fully modular
+          ───────────────────────────────────────────────────────────── */}
           {currentStep === 6 && (
-            <div className="space-y-6">
-              <h2 className="text-xl font-bold text-gray-800 mb-4">
-                Review & Submit
-              </h2>
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-                <h3 className="font-semibold text-blue-900 mb-2">
-                  Application Summary
-                </h3>
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div>
-                    <span className="font-semibold">Name:</span>{" "}
-                    {formData.fullName}
-                  </div>
-                  <div>
-                    <span className="font-semibold">Applied For:</span>{" "}
-                    {formData.appliedFor}
-                  </div>
-                  <div>
-                    <span className="font-semibold">Session:</span>{" "}
-                    {formData.session}
-                  </div>
-                  <div>
-                    <span className="font-semibold">Contact:</span>{" "}
-                    {formData.contactNo}
-                  </div>
-                  <div>
-                    <span className="font-semibold">Email:</span>{" "}
-                    {formData.email}
-                  </div>
-                  <div>
-                    <span className="font-semibold">Percentage:</span>{" "}
-                    {formData.percentage}%
-                  </div>
-                </div>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="text-xl font-bold text-gray-800">
+                  Review & Submit
+                </h2>
+                <span className="text-xs text-gray-400 bg-gray-100 px-3 py-1 rounded-full">
+                  Please verify all details before submitting
+                </span>
               </div>
 
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
-                <h3 className="font-semibold text-green-900 mb-2">
-                  Uploaded Documents
-                </h3>
-                <ul className="text-sm space-y-1">
-                  {Object.entries(files).map(
-                    ([key, file]) =>
-                      file && (
-                        <li key={key} className="flex items-center gap-2">
-                          <svg
-                            className="w-4 h-4 text-green-600"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M5 13l4 4L19 7"
-                            />
-                          </svg>
-                          <span>{file.name}</span>
-                        </li>
-                      ),
-                  )}
-                </ul>
-              </div>
+              {/* All review sections */}
+              <ReviewBasicInfo formData={formData} />
+              <ReviewPersonalDetails formData={formData} />
+              <ReviewAddressDetails formData={formData} />
+              <ReviewAcademicDetails formData={formData} />
+              <ReviewDocuments files={files} />
 
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
-                <h3 className="font-bold text-lg mb-3">
+              {/* Disclaimer */}
+              <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6">
+                <h3 className="font-bold text-base text-gray-800 mb-3">
                   Disclaimer By Applicant
                 </h3>
                 <p className="text-sm text-gray-700 mb-4">
@@ -1101,13 +1055,13 @@ const ApplicationForm = () => {
                   time. No claim will be applied by me or my family or friend in
                   future.
                 </p>
-                <label className="flex items-start gap-3">
+                <label className="flex items-start gap-3 cursor-pointer">
                   <input
                     type="checkbox"
                     name="disclaimerAgreed"
                     checked={formData.disclaimerAgreed}
                     onChange={handleChange}
-                    className="mt-1"
+                    className="mt-1 w-4 h-4 accent-blue-600"
                     required
                   />
                   <span className="text-sm text-gray-700">
@@ -1128,7 +1082,7 @@ const ApplicationForm = () => {
                 className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
                 disabled={loading}
               >
-                Previous
+                ← Previous
               </button>
             )}
             {currentStep < 6 ? (
@@ -1137,13 +1091,13 @@ const ApplicationForm = () => {
                 onClick={nextStep}
                 className="ml-auto px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
               >
-                Next
+                Next →
               </button>
             ) : (
               <button
                 type="submit"
-                disabled={loading}
-                className="ml-auto btn-primary"
+                disabled={loading || !formData.disclaimerAgreed}
+                className="ml-auto px-8 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
               >
                 {loading ? "Submitting..." : "Submit Application"}
               </button>

@@ -18,6 +18,8 @@ app.use(express.urlencoded({ extended: true }));
 // CORS
 app.use(cors());
 
+app.use("/uploads", express.static(require("path").join(__dirname, "uploads")));
+
 // Debug middleware - Log all requests
 app.use((req, res, next) => {
   console.log("\n=== INCOMING REQUEST ===");

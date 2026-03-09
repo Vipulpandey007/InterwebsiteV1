@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { adminAPI } from "../services/api";
 import toast from "react-hot-toast";
+import ApplicationDetailModal from "../components/admin/ApplicationDetailModal";
+import * as XLSX from "xlsx";
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -17,6 +19,9 @@ const AdminDashboard = () => {
   const [applications, setApplications] = useState([]);
   const [filter, setFilter] = useState("all"); // all, pending, approved, rejected
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedApplication, setSelectedApplication] = useState(null);
+  const [modalLoading, setModalLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     fetchDashboardData();
@@ -50,6 +55,179 @@ const AdminDashboard = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleViewApplication = async (applicationId) => {
+    try {
+      setModalLoading(true);
+      const response = await adminAPI.getApplicationById(applicationId);
+      if (response.data.success) {
+        setSelectedApplication(response.data.data.application);
+      }
+    } catch (error) {
+      toast.error("Failed to load application details");
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
+  const handleExportExcel = async (exportAll = false) => {
+    try {
+      setExporting(true);
+      toast.loading("Preparing export...", { id: "export" });
+
+      // If exporting all, fetch fresh full data; otherwise use filtered list
+      let dataToExport = exportAll ? applications : filteredApplications;
+
+      // If we need complete data for all apps, fetch each one
+      // For efficiency we use the already-loaded applications list
+      // (getAllApplications already returns full documents)
+      const rows = dataToExport.map((app, index) => {
+        const docs = app.documents || {};
+        return {
+          "S.No": index + 1,
+          "Application Number": app.applicationNumber || "",
+          "Session": app.session || "",
+          "Applied For (Stream)": app.appliedFor || "",
+          "Reference Number": app.referenceNumber || "",
+
+          // Personal Details
+          "Full Name": app.fullName || "",
+          "Father's Name": app.fatherName || "",
+          "Mother's Name": app.motherName || "",
+          "Date of Birth": app.dateOfBirth ? new Date(app.dateOfBirth).toLocaleDateString("en-IN") : "",
+          "Gender": app.gender || "",
+          "Category": app.category || "",
+          "Religion": app.religion || "",
+          "Mother Tongue": app.motherTongue || "",
+          "Blood Group": app.bloodGroup || "",
+          "Height (cm)": app.studentHeight || "",
+          "Weight (kg)": app.studentWeight || "",
+          "Nationality": app.nationality || "",
+          "Aapar ID": app.aaparId || "",
+
+          // Contact
+          "Contact No.": app.contactNo || "",
+          "WhatsApp No.": app.whatsappNo || "",
+          "Guardian Contact No.": app.guardianContactNo || "",
+          "Email": app.email || "",
+          "Aadhar Card No.": app.aadharCard || "",
+
+          // Address
+          "Present Address": app.presentAddress || "",
+          "Permanent Address": app.permanentAddress || "",
+
+          // Education
+          "School Name": app.schoolName || "",
+          "Board": app.board || "",
+          "Subject": app.subject || "",
+          "Year of Passing": app.yearOfPassing || "",
+          "Marks Obtained": app.marksObtained || "",
+          "Total Marks": app.totalMarks || "",
+          "Percentage (%)": app.percentage || "",
+          "Grade": app.grade || "",
+          "Division": app.division || "",
+
+          // Payment
+          "Application Fee (₹)": app.amount || "",
+          "Payment Status": app.paymentStatus || "",
+          "Transaction ID": app.transactionId || "",
+          "Razorpay Order ID": app.razorpayOrderId || "",
+          "Razorpay Payment ID": app.razorpayPaymentId || "",
+          "Payment Date": app.paymentDate ? new Date(app.paymentDate).toLocaleDateString("en-IN") : "",
+
+          // Application Status
+          "Application Status": app.status || "",
+          "Admit Card Generated": app.admitCardGenerated ? "Yes" : "No",
+          "Disclaimer Agreed": app.disclaimerAgreed ? "Yes" : "No",
+          "Submitted On": app.createdAt ? new Date(app.createdAt).toLocaleDateString("en-IN") : "",
+
+          // Documents
+          "10th Marksheet": docs.tenthMarksheet ? "Uploaded" : "Not Uploaded",
+          "10th Admit Card": docs.tenthAdmitCard ? "Uploaded" : "Not Uploaded",
+          "Transfer Certificate": docs.transferCertificate ? "Uploaded" : "Not Uploaded",
+          "Character Certificate": docs.characterCertificate ? "Uploaded" : "Not Uploaded",
+          "Migration Certificate": docs.migration ? "Uploaded" : "Not Uploaded",
+          "Caste Certificate": docs.casteCertificate ? "Uploaded" : "Not Uploaded",
+          "BPL Certificate": docs.bplCertificate ? "Uploaded" : "Not Uploaded",
+          "Aadhar Card Doc": docs.aadharCardDoc ? "Uploaded" : "Not Uploaded",
+          "Student Photo": docs.studentPhoto ? "Uploaded" : "Not Uploaded",
+        };
+      });
+
+      // Create workbook
+      const wb = XLSX.utils.book_new();
+
+      // --- Sheet 1: All Application Data ---
+      const ws = XLSX.utils.json_to_sheet(rows);
+
+      // Set column widths
+      const colWidths = Object.keys(rows[0] || {}).map((key) => ({
+        wch: Math.max(key.length, 18),
+      }));
+      ws["!cols"] = colWidths;
+
+      // Style header row (bold + background) using SheetJS
+      const range = XLSX.utils.decode_range(ws["!ref"]);
+      for (let C = range.s.c; C <= range.e.c; C++) {
+        const cellAddress = XLSX.utils.encode_cell({ r: 0, c: C });
+        if (!ws[cellAddress]) continue;
+        ws[cellAddress].s = {
+          font: { bold: true, color: { rgb: "FFFFFF" } },
+          fill: { fgColor: { rgb: "4F46E5" } },
+          alignment: { horizontal: "center", wrapText: true },
+        };
+      }
+
+      XLSX.utils.book_append_sheet(wb, ws, "Applications");
+
+      // --- Sheet 2: Summary ---
+      const summaryData = [
+        ["Gossner Intermediate College, Ranchi"],
+        ["Admission Portal - Export Summary"],
+        [""],
+        ["Export Date", new Date().toLocaleDateString("en-IN")],
+        ["Export Time", new Date().toLocaleTimeString("en-IN")],
+        [""],
+        ["STATISTICS"],
+        ["Total Applications", stats.totalApplications],
+        ["Pending", stats.pendingApplications],
+        ["Approved", stats.approvedApplications],
+        ["Rejected", stats.rejectedApplications],
+        ["Today's Applications", stats.todayApplications],
+        ["Total Revenue (₹)", stats.totalRevenue],
+        [""],
+        ["THIS EXPORT"],
+        ["Records Exported", rows.length],
+        ["Filter Applied", exportAll ? "None (All Applications)" : `Filter: ${filter}, Search: "${searchTerm || "none"}"`],
+      ];
+
+      const ws2 = XLSX.utils.aoa_to_sheet(summaryData);
+      ws2["!cols"] = [{ wch: 30 }, { wch: 30 }];
+      XLSX.utils.book_append_sheet(wb, ws2, "Summary");
+
+      // Generate filename
+      const date = new Date().toISOString().slice(0, 10);
+      const label = exportAll ? "All" : `Filtered_${filteredApplications.length}`;
+      const filename = `GIC_Applications_${label}_${date}.xlsx`;
+
+      XLSX.writeFile(wb, filename);
+      toast.success(`Exported ${rows.length} applications`, { id: "export" });
+    } catch (error) {
+      console.error("Export error:", error);
+      toast.error("Export failed", { id: "export" });
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleApplicationUpdated = (updatedApplication) => {
+    // Update the application in the list without a full refetch
+    setApplications((prev) =>
+      prev.map((app) =>
+        app._id === updatedApplication._id ? updatedApplication : app
+      )
+    );
   };
 
   const handleStatusChange = async (applicationId, newStatus) => {
@@ -347,10 +525,32 @@ const AdminDashboard = () => {
 
         {/* Applications Table */}
         <div className="bg-white rounded-lg shadow overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200">
+          <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
             <h3 className="text-lg font-medium text-gray-900">
               Applications ({filteredApplications.length})
             </h3>
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleExportExcel(false)}
+                disabled={exporting || filteredApplications.length === 0}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition"
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                {exporting ? "Exporting..." : `Export Filtered (${filteredApplications.length})`}
+              </button>
+              <button
+                onClick={() => handleExportExcel(true)}
+                disabled={exporting || applications.length === 0}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition"
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                {exporting ? "Exporting..." : `Export All (${applications.length})`}
+              </button>
+            </div>
           </div>
 
           <div className="overflow-x-auto">
@@ -436,12 +636,11 @@ const AdminDashboard = () => {
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <div className="flex gap-2">
                           <button
-                            onClick={() =>
-                              navigate(`/admin/application/${app._id}`)
-                            }
-                            className="text-indigo-600 hover:text-indigo-900"
+                            onClick={() => handleViewApplication(app._id)}
+                            disabled={modalLoading}
+                            className="text-indigo-600 hover:text-indigo-900 disabled:opacity-50"
                           >
-                            View
+                            {modalLoading ? "Loading..." : "View"}
                           </button>
                           {app.status === "submitted" && (
                             <>
@@ -473,6 +672,14 @@ const AdminDashboard = () => {
           </div>
         </div>
       </div>
+
+      {selectedApplication && (
+        <ApplicationDetailModal
+          application={selectedApplication}
+          onClose={() => setSelectedApplication(null)}
+          onUpdated={handleApplicationUpdated}
+        />
+      )}
     </div>
   );
 };

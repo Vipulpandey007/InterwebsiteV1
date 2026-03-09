@@ -137,7 +137,7 @@ const downloadPDF = async (req, res) => {
       .fillColor("#000")
       .text("GOSSNER INTERMEDIATE COLLEGE, RANCHI", 130, 55, {
         width: 400,
-        align: "left",
+        align: "center",
       });
 
     doc
@@ -148,13 +148,16 @@ const downloadPDF = async (req, res) => {
         "Niral Enem Horo Marg, G.E.L. Church Compound, Ranchi-834001, Jharkhand.",
         130,
         78,
-        { width: 400 },
+        { width: 400, align: "center" },
       );
 
     doc
       .fontSize(9)
       .fillColor("#1e40af")
-      .text("website: www.gcraninter.org", 130, 93, { width: 400 });
+      .text("website: www.gcraninter.org", 130, 93, {
+        width: 400,
+        align: "center",
+      });
 
     // Horizontal line below header
     doc
@@ -203,8 +206,8 @@ const downloadPDF = async (req, res) => {
     if (application.documents && application.documents.studentPhoto) {
       try {
         const photoPath = path.join(
-          // __dirname,
-          // "..",
+          __dirname,
+          "../uploads/photos/",
           application.documents.studentPhoto,
         );
         console.log("📸 Looking for photo at:", photoPath);

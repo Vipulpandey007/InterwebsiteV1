@@ -363,7 +363,7 @@ const Dashboard = () => {
                               onClick={handleGeneratePDF}
                               className="btn-primary"
                             >
-                              Generate Admit Card
+                              Generate Application Form
                             </button>
                           )}
                         </div>

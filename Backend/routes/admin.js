@@ -6,6 +6,7 @@ const {
   getStats,
   getAllApplications,
   getApplicationById,
+  updateApplication,
   updateApplicationStatus,
   createAdmin,
 } = require("../controllers/adminController");
@@ -34,6 +35,11 @@ router.get("/applications", protect, adminOnly, getAllApplications);
 // @desc    Get application by ID
 // @access  Private (Admin only)
 router.get("/applications/:id", protect, adminOnly, getApplicationById);
+
+// @route   PUT /api/admin/applications/:id
+// @desc    Update application fields (admin edit)
+// @access  Private (Admin only)
+router.put("/applications/:id", protect, adminOnly, updateApplication);
 
 // @route   PUT /api/admin/applications/:id/status
 // @desc    Update application status

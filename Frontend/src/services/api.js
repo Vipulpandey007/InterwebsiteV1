@@ -143,6 +143,7 @@ export const adminAPI = {
     return api.get("/admin/applications");
   },
   getApplicationById: (id) => api.get(`/admin/applications/${id}`),
+  updateApplication: (id, data) => api.put(`/admin/applications/${id}`, data),
   updateApplicationStatus: (id, status) => {
     console.log("🔄 Updating application status:", id, status);
     return api.put(`/admin/applications/${id}/status`, { status });
