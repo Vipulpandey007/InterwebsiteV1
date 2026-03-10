@@ -6,6 +6,20 @@ export default {
 
   theme: {
     extend: {
+      animation: {
+        "scroll-left": "scrollLeft 40s linear infinite",
+        "scroll-right": "scrollRight 40s linear infinite",
+      },
+      keyframes: {
+        scrollLeft: {
+          "0%": { transform: "translateX(0)" },
+          "100%": { transform: "translateX(-50%)" },
+        },
+        scrollRight: {
+          "0%": { transform: "translateX(-50%)" },
+          "100%": { transform: "translateX(0)" },
+        },
+      },
       colors: {
         background: "var(--background)",
         foreground: "var(--foreground)",
