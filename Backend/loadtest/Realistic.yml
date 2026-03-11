@@ -1,0 +1,130 @@
+# ============================================================
+#  Realistic Load Test — Gossner College Admission Portal
+#  Models actual expected traffic (not a stress test)
+#  Run: artillery run realistic.yml --output realistic-report.json
+# ============================================================
+
+config:
+  target: "http://localhost:5000"
+  processor: "./Processor.js"
+  phases:
+    # Normal day — a few students applying
+    - name: "Normal Day"
+      duration: 60
+      arrivalRate: 3
+
+    # Busy period — word spreads about admissions
+    - name: "Busy Period"
+      duration: 60
+      arrivalRate: 8
+
+    # Peak rush — last few days before deadline
+    - name: "Deadline Rush"
+      duration: 60
+      arrivalRate: 15
+
+    # Admin working hours — checking applications
+    - name: "Admin Review Period"
+      duration: 30
+      arrivalRate: 5
+
+  defaults:
+    headers:
+      Content-Type: "application/json"
+
+  # Realistic thresholds for a college portal
+  ensure:
+    p95: 3000 # 95% of requests under 3 seconds
+    p99: 5000 # 99% of requests under 5 seconds
+    maxErrorRate: 2
+
+  variables:
+    adminEmail: "admin@gcraninter.org"
+    adminPassword: "admin123"
+
+  plugins:
+    expect: {}
+
+scenarios:
+  - name: "Health Check"
+    weight: 5
+    flow:
+      - get:
+          url: "/api/health"
+          expect:
+            - statusCode: 200
+
+  - name: "Student Signup"
+    weight: 35
+    flow:
+      - function: "generateMobile"
+      - post:
+          url: "/api/auth/signup"
+          json:
+            name: "Test Student"
+            mobile: "{{ mobile }}"
+            email: "student{{ mobile }}@test.com"
+            password: "Test@1234"
+          expect:
+            - statusCode: [200, 201, 400]
+      - think: 3
+      - post:
+          url: "/api/auth/login"
+          json:
+            mobile: "{{ mobile }}"
+          expect:
+            - statusCode: [200, 404]
+
+  - name: "Admin Reviews Applications"
+    weight: 40
+    flow:
+      - post:
+          url: "/api/admin/login"
+          json:
+            email: "{{ adminEmail }}"
+            password: "{{ adminPassword }}"
+          capture:
+            - json: "$.data.token"
+              as: "adminToken"
+          expect:
+            - statusCode: 200
+      - think: 2
+      - get:
+          url: "/api/admin/stats"
+          headers:
+            Authorization: "Bearer {{ adminToken }}"
+          expect:
+            - statusCode: 200
+      - think: 1
+      - get:
+          url: "/api/admin/applications"
+          headers:
+            Authorization: "Bearer {{ adminToken }}"
+          expect:
+            - statusCode: 200
+
+  - name: "Admin Views Single Application"
+    weight: 20
+    flow:
+      - post:
+          url: "/api/admin/login"
+          json:
+            email: "{{ adminEmail }}"
+            password: "{{ adminPassword }}"
+          capture:
+            - json: "$.data.token"
+              as: "adminToken"
+      - get:
+          url: "/api/admin/applications"
+          headers:
+            Authorization: "Bearer {{ adminToken }}"
+          capture:
+            - json: "$.data.applications[0]._id"
+              as: "appId"
+      - get:
+          url: "/api/admin/applications/{{ appId }}"
+          headers:
+            Authorization: "Bearer {{ adminToken }}"
+          ifTrue: "appId"
+          expect:
+            - statusCode: 200

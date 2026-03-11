@@ -1,0 +1,227 @@
+# ============================================================
+#  Gossner College Admission Portal — Artillery Load Test
+#  Tests: Auth, Admin Dashboard, Applications, Payment
+#  Run: artillery run loadtest.yml --output report.json
+#  Report: artillery report report.json
+# ============================================================
+
+config:
+  target: "http://localhost:5000"
+  processor: "./Processor.js"
+  phases:
+    # Phase 1: Warm up — gentle ramp to catch early issues
+    - name: "Warm Up"
+      duration: 30
+      arrivalRate: 5
+      rampTo: 20
+
+    # Phase 2: Normal load — simulates a typical busy day
+    - name: "Normal Load"
+      duration: 60
+      arrivalRate: 20
+
+    # Phase 3: Peak load — stress test (college admission rush)
+    - name: "Peak Load (Stress)"
+      duration: 60
+      arrivalRate: 20
+      rampTo: 80
+
+    # Phase 4: Spike — sudden burst (e.g. last day of admissions)
+    - name: "Spike Test"
+      duration: 30
+      arrivalRate: 150
+
+    # Phase 5: Recovery — server should recover gracefully
+    - name: "Recovery"
+      duration: 30
+      arrivalRate: 10
+
+  # Default headers for all requests
+  defaults:
+    headers:
+      Content-Type: "application/json"
+
+  # Thresholds — test FAILS if these are breached
+  ensure:
+    p99: 3000 # 99th percentile response < 3 seconds
+    p95: 2000 # 95th percentile response < 2 seconds
+    maxErrorRate: 5 # Less than 5% errors overall
+
+  # Capture variables shared across scenarios
+  variables:
+    adminEmail: "admin@gcraninter.org"
+    adminPassword: "admin123"
+
+  plugins:
+    expect: {}
+
+scenarios:
+  # ─────────────────────────────────────────────
+  # SCENARIO 1: Health Check (weight: 5)
+  # Quick sanity — always should be 200
+  # ─────────────────────────────────────────────
+  - name: "Health Check"
+    weight: 5
+    flow:
+      - get:
+          url: "/api/health"
+          expect:
+            - statusCode: 200
+
+  # ─────────────────────────────────────────────
+  # SCENARIO 2: Admin Login + Dashboard (weight: 25)
+  # Most common admin flow
+  # ─────────────────────────────────────────────
+  - name: "Admin Login and Dashboard"
+    weight: 25
+    flow:
+      # Step 1: Admin Login
+      - post:
+          url: "/api/admin/login"
+          json:
+            email: "{{ adminEmail }}"
+            password: "{{ adminPassword }}"
+          capture:
+            - json: "$.data.token"
+              as: "adminToken"
+          expect:
+            - statusCode: 200
+            - hasProperty: "data.token"
+
+      # Step 2: Get Stats
+      - get:
+          url: "/api/admin/stats"
+          headers:
+            Authorization: "Bearer {{ adminToken }}"
+          expect:
+            - statusCode: 200
+
+      # Step 3: Get All Applications
+      - get:
+          url: "/api/admin/applications"
+          headers:
+            Authorization: "Bearer {{ adminToken }}"
+          expect:
+            - statusCode: 200
+
+      # Step 4: Simulate reading multiple applications (like pagination)
+      - think: 1
+
+      - get:
+          url: "/api/admin/applications"
+          headers:
+            Authorization: "Bearer {{ adminToken }}"
+          expect:
+            - statusCode: 200
+
+  # ─────────────────────────────────────────────
+  # SCENARIO 3: Admin Login — Failed Attempts (weight: 10)
+  # Tests auth error handling under load
+  # ─────────────────────────────────────────────
+  - name: "Failed Admin Login"
+    weight: 10
+    flow:
+      - post:
+          url: "/api/admin/login"
+          json:
+            email: "wrong@email.com"
+            password: "wrongpassword"
+          expect:
+            - statusCode: 401
+
+  # ─────────────────────────────────────────────
+  # SCENARIO 4: Student Auth Flow (weight: 30)
+  # Signup → OTP verify → Login
+  # Uses random mobile numbers to simulate new users
+  # ─────────────────────────────────────────────
+  - name: "Student Auth Flow"
+    weight: 30
+    flow:
+      # Generate a random 10-digit mobile
+      - function: "generateMobile"
+
+      # Initiate signup
+      - post:
+          url: "/api/auth/signup"
+          json:
+            name: "Test Student {{ $randomString(6) }}"
+            mobile: "{{ mobile }}"
+            email: "test{{ $randomNumber(1000, 9999) }}@test.com"
+            password: "Test@1234"
+          expect:
+            - statusCode: [200, 201, 400]
+            # 400 is acceptable — mobile might already exist
+
+      # Think time — simulates user checking OTP
+      - think: 2
+
+      # Attempt login (OTP flow — will get OTP sent)
+      - post:
+          url: "/api/auth/login"
+          json:
+            mobile: "{{ mobile }}"
+          expect:
+            - statusCode: [200, 404]
+
+  # ─────────────────────────────────────────────
+  # SCENARIO 5: Admin fetches single application (weight: 20)
+  # Simulates admin reviewing applications one by one
+  # ─────────────────────────────────────────────
+  - name: "Admin View Single Application"
+    weight: 20
+    flow:
+      # Login first
+      - post:
+          url: "/api/admin/login"
+          json:
+            email: "{{ adminEmail }}"
+            password: "{{ adminPassword }}"
+          capture:
+            - json: "$.data.token"
+              as: "adminToken"
+
+      # Get all applications to grab an ID
+      - get:
+          url: "/api/admin/applications"
+          headers:
+            Authorization: "Bearer {{ adminToken }}"
+          capture:
+            - json: "$.data.applications[0]._id"
+              as: "appId"
+
+      # Fetch that specific application
+      - get:
+          url: "/api/admin/applications/{{ appId }}"
+          headers:
+            Authorization: "Bearer {{ adminToken }}"
+          ifTrue: "appId"
+          expect:
+            - statusCode: 200
+
+  # ─────────────────────────────────────────────
+  # SCENARIO 6: Payment Order Creation (weight: 10)
+  # Tests Razorpay order creation under load
+  # (Uses a dummy application ID — will return 404 but
+  #  still stress-tests the route + DB query)
+  # ─────────────────────────────────────────────
+  - name: "Payment Flow"
+    weight: 10
+    flow:
+      - post:
+          url: "/api/auth/login"
+          json:
+            mobile: "9999999999"
+          capture:
+            - json: "$.data.token"
+              as: "userToken"
+          expect:
+            - statusCode: [200, 404]
+
+      - post:
+          url: "/api/payment/create-order"
+          headers:
+            Authorization: "Bearer {{ userToken }}"
+          json:
+            applicationId: "000000000000000000000000"
+          expect:
+            - statusCode: [200, 400, 404]

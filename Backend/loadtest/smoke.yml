@@ -1,0 +1,67 @@
+# ============================================================
+#  Smoke Test — Run this BEFORE the full load test
+#  Just 1 virtual user, 10 seconds, verifies all routes work
+#  Run: artillery run smoke.yml
+# ============================================================
+
+config:
+  target: "http://localhost:5000"
+  phases:
+    - name: "Smoke Test"
+      duration: 10
+      arrivalRate: 1
+  defaults:
+    headers:
+      Content-Type: "application/json"
+  plugins:
+    expect: {}
+
+scenarios:
+  - name: "Smoke: Health"
+    flow:
+      - get:
+          url: "/api/health"
+          expect:
+            - statusCode: 200
+
+  - name: "Smoke: Admin Login + Stats + Applications"
+    flow:
+      - post:
+          url: "/api/admin/login"
+          json:
+            email: "admin@gcraninter.org"
+            password: "admin123"
+          capture:
+            - json: "$.data.token"
+              as: "adminToken"
+          expect:
+            - statusCode: 200
+            - hasProperty: "data.token"
+
+      - get:
+          url: "/api/admin/stats"
+          headers:
+            Authorization: "Bearer {{ adminToken }}"
+          expect:
+            - statusCode: 200
+            - hasProperty: "data.totalApplications"
+
+      - get:
+          url: "/api/admin/applications"
+          headers:
+            Authorization: "Bearer {{ adminToken }}"
+          expect:
+            - statusCode: 200
+            - hasProperty: "data.applications"
+
+  - name: "Smoke: Student Signup Attempt"
+    flow:
+      - post:
+          url: "/api/auth/signup"
+          json:
+            name: "Smoke Test User"
+            mobile: "9000000001"
+            email: "smoketest@test.com"
+            password: "Test@1234"
+          expect:
+            - statusCode: [200, 201, 400]

@@ -256,6 +256,24 @@ applicationSchema.virtual("age").get(function () {
   return null;
 });
 
+// Index: status — used in admin filters (approved/rejected/pending)
+applicationSchema.index({ status: 1 });
+
+// Index: createdAt — used in all sorts (newest first)
+applicationSchema.index({ createdAt: -1 });
+
+// Index: userId — used in getMyApplications and auth checks
+applicationSchema.index({ userId: 1 });
+
+// Index: applicationNumber — used in search and PDF generation
+applicationSchema.index({ applicationNumber: 1 });
+
+// Index: paymentStatus — used in revenue aggregation in getStats
+applicationSchema.index({ paymentStatus: 1 });
+
+// Compound index: status + createdAt — used in admin filtered+sorted list
+applicationSchema.index({ status: 1, createdAt: -1 });
+
 module.exports =
   mongoose.models.Application ||
   mongoose.model("Application", applicationSchema);
