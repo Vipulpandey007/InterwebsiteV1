@@ -138,9 +138,13 @@ export const adminAPI = {
   },
 
   // Applications
-  getAllApplications: () => {
-    console.log("📋 Fetching all applications...");
-    return api.get("/admin/applications");
+  getAllApplications: (params = {}) => {
+    const { page = 1, limit = 20, status, search } = params;
+    const query = new URLSearchParams({ page, limit });
+    if (status && status !== "all") query.set("status", status);
+    if (search) query.set("search", search);
+    console.log("📋 Fetching applications:", query.toString());
+    return api.get(`/admin/applications?${query.toString()}`);
   },
   getApplicationById: (id) => api.get(`/admin/applications/${id}`),
   updateApplication: (id, data) => api.put(`/admin/applications/${id}`, data),

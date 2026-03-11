@@ -142,16 +142,48 @@ const getAllApplications = async (req, res) => {
   try {
     const Application = require("../models/Application");
 
-    const applications = await Application.find()
-      .populate("userId", "name email mobile")
-      .sort({ createdAt: -1 });
+    // Pagination — defaults to page 1, 20 per page
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const skip = (page - 1) * limit;
+
+    // Build filter
+    const filter = {};
+
+    // Status filter
+    if (req.query.status && req.query.status !== "all") {
+      filter.status = req.query.status;
+    }
+
+    // Search — matches name, email, applicationNumber, contactNo
+    if (req.query.search && req.query.search.trim()) {
+      const regex = new RegExp(req.query.search.trim(), "i");
+      filter.$or = [
+        { fullName: regex },
+        { email: regex },
+        { applicationNumber: regex },
+        { contactNo: regex },
+      ];
+    }
+
+    // Run count + fetch in parallel
+    const [applications, total] = await Promise.all([
+      Application.find(filter)
+        .populate("userId", "name email mobile")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Application.countDocuments(filter),
+    ]);
 
     res.status(200).json({
       success: true,
       count: applications.length,
-      data: {
-        applications,
-      },
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+      data: { applications },
     });
   } catch (error) {
     console.error("Get All Applications Error:", error);
@@ -268,21 +300,14 @@ const updateApplication = async (req, res) => {
   try {
     const Application = require("../models/Application");
 
-    console.log("\n╔════════════════════════════════════════╗");
-    console.log("║     ADMIN UPDATE APPLICATION           ║");
-    console.log("╚════════════════════════════════════════╝");
-    console.log("Application ID:", req.params.id);
-
     const application = await Application.findById(req.params.id);
-
     if (!application) {
-      return res.status(404).json({
-        success: false,
-        message: "Application not found",
-      });
+      return res
+        .status(404)
+        .json({ success: false, message: "Application not found" });
     }
 
-    // Only allow editing these fields — payment, documents, status are excluded
+    // Whitelist of editable fields — excludes payment, documents, status
     const allowedFields = [
       "appliedFor",
       "session",
@@ -325,8 +350,6 @@ const updateApplication = async (req, res) => {
 
     await application.save();
 
-    console.log("✅ Application updated by admin");
-
     res.status(200).json({
       success: true,
       message: "Application updated successfully",
@@ -337,8 +360,6 @@ const updateApplication = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to update application",
-      error:
-        process.env.NODE_ENV === "development" ? error.message : "Server error",
     });
   }
 };

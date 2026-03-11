@@ -1,0 +1,71 @@
+Project: Gossner Intermediate College Admission Portal (MERN Stack)
+Ranchi, Jharkhand. Session 2026-27. Status: 95% complete and fully functional.
+Tech Stack
+
+Backend: Node.js/Express on port 5000, MongoDB/Mongoose, JWT, bcryptjs (rounds: 10), Razorpay, PDFKit, Multer
+Frontend: React 18, React Router, Axios, React Hot Toast, SheetJS (xlsx)
+Process Manager: PM2 cluster mode (ecosystem.config.js in Backend/)
+Admin credentials: admin@gcraninter.org / admin123
+
+Folder layout
+
+D:\Intermediatewebsite\Backend\ — Node/Express server
+D:\Intermediatewebsite\Frontend\ — React app
+
+Backend key files
+
+models/User.js — user schema, role: user/admin, bcrypt rounds 10
+models/Application.js — 41-field schema, 5 indexes (status, createdAt, userId, paymentStatus, compound status+createdAt). Do NOT add index on applicationNumber — it already has unique:true
+controllers/applicationController.js — stores uploaded files as .filename only, NOT .path (critical bug already fixed)
+controllers/adminController.js — has all 6 exports: adminLogin, getStats, getAllApplications, getApplicationById, updateApplication, updateApplicationStatus, createAdmin
+controllers/paymentController.js — Razorpay order + verify
+controllers/pdfController.js — PDFKit admit card with student photo
+middleware/authMiddleware.js — protect (JWT) + adminOnly (role check)
+config/db.js — maxPoolSize: 20, minPoolSize: 5
+config/multerConfig.js — uploads/photos/ and uploads/documents/
+ecosystem.config.js — PM2 cluster config (instances: max)
+server.js — must have: app.use('/uploads', express.static(path.join(__dirname, 'uploads'))) already added
+
+Frontend key files
+
+src/pages/AdminDashboard.jsx — stats cards, filter/search, view modal, edit modal, Excel export (Export Filtered + Export All)
+src/pages/ApplicationForm.jsx — 6-step form, step 6 is full review of all 41 fields
+src/components/admin/ApplicationDetailModal.jsx — full view of all 41 fields + documents, has Edit button in footer
+src/components/admin/ApplicationEditModal.jsx — edit modal orchestrating 5 section components, has unsaved changes badge
+src/components/admin/shared/FormField.jsx — reusable input (text/select/textarea/date/number)
+src/components/admin/shared/SectionWrapper.jsx — reusable section wrapper
+src/components/admin/editSections/ — ApplicationInfoSection, PersonalDetailsSection, ContactDetailsSection, AddressSection, AcademicSection
+src/components/review/ — ReviewField, ReviewSection, ReviewBasicInfo, ReviewPersonalDetails, ReviewAddressDetails, ReviewAcademicDetails, ReviewDocuments
+src/services/api.js — axios with two interceptors: one for user token, one for adminToken
+
+Application model — 41 fields
+appliedFor, session, referenceNumber, fullName, fatherName, motherName, dateOfBirth, gender, category, religion, motherTongue, bloodGroup, studentHeight, studentWeight, nationality, aaparId, contactNo, whatsappNo, guardianContactNo, email, aadharCard, presentAddress, permanentAddress, schoolName, board, subject, marksObtained, totalMarks, percentage, grade, yearOfPassing, division, documents (studentPhoto, tenthMarksheet, tenthAdmitCard, transferCertificate, characterCertificate, migration, casteCertificate, bplCertificate, aadharCardDoc), status, paymentStatus, amount, transactionId, razorpayOrderId, razorpayPaymentId, admitCardGenerated, disclaimerAgreed
+Admin API routes
+
+POST /api/admin/login
+GET /api/admin/stats
+GET /api/admin/applications?page=1&limit=50&status=all
+GET /api/admin/applications/:id
+PUT /api/admin/applications/:id — edit fields (updateApplication)
+PUT /api/admin/applications/:id/status — change status only
+
+Bugs already fixed (do not redo)
+
+View button — now opens ApplicationDetailModal (not navigate)
+Document URLs — stored as filename only, served via /uploads/ static route
+Student photo not loading — express.static added in server.js
+updateApplication missing — now exists in adminController + exports
+Duplicate index warning — applicationNumber index removed from patch
+Route.put() undefined error — was caused by missing updateApplication export
+API interceptor — adminToken correctly sent for all admin routes
+
+Load test results (Artillery)
+
+Stress test (150 users/sec): 66% failure — expected, machine limitation
+Realistic test (3–15 users/sec): 100% pass, 0 timeouts, p95 = 821ms
+Server is production-ready for actual college admission traffic
+
+Remaining tasks
+
+Frontend pagination UI for admin applications list (backend already supports ?page=&limit=)
+.env file needs: JWT_SECRET, MONGO_URI, RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, JWT_EXPIRE
