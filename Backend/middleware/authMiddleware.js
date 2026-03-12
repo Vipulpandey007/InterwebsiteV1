@@ -24,6 +24,12 @@ const protect = async (req, res, next) => {
     console.log("✅ Token found in Bearer header");
   }
 
+  // Fallback: token in query string (?token=...) — used by window.open PDF downloads
+  if (!token && req.query.token) {
+    token = req.query.token;
+    console.log("✅ Token found in query string");
+  }
+
   // Check if token exists
   if (!token) {
     console.error("❌ No token found - Unauthorized");

@@ -7,7 +7,8 @@ const {
   getAllApplications,
   getApplicationById,
   updateApplicationStatus,
-  updateApplication, // 1. ADDED THIS IMPORT
+  updateApplication,
+  getActivityLog,
   createAdmin,
   getSettings,
   updateSettings,
@@ -32,6 +33,11 @@ router.get("/stats", protect, adminOnly, getStats);
 // @desc    Get all applications
 // @access  Private (Admin only)
 router.get("/applications", protect, adminOnly, getAllApplications);
+
+// @route   GET /api/admin/applications/:id/activity
+// @desc    Get activity log for an application
+// @access  Private (Admin only)
+router.get("/applications/:id/activity", protect, adminOnly, getActivityLog);
 
 // @route   GET /api/admin/applications/:id
 // @desc    Get application by ID

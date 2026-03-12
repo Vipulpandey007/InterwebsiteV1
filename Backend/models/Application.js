@@ -222,6 +222,34 @@ const applicationSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+
+    // Activity Log — tracks all admin actions on this application
+    activityLog: [
+      {
+        action: {
+          type: String,
+          enum: [
+            "status_changed",
+            "fields_edited",
+            "created",
+            "submitted",
+            "payment_completed",
+          ],
+          required: true,
+        },
+        by: {
+          type: String, // admin email
+          required: true,
+        },
+        fromValue: { type: String, default: null }, // previous status or summary
+        toValue: { type: String, default: null }, // new status or summary
+        note: { type: String, default: null }, // human-readable description
+        at: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
   },
   {
     timestamps: true,

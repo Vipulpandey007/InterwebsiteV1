@@ -119,6 +119,10 @@ export const paymentAPI = {
 export const pdfAPI = {
   generate: (applicationId) => api.post(`/pdf/generate/${applicationId}`),
   getStatus: (applicationId) => api.get(`/pdf/status/${applicationId}`),
+  applicationSummaryURL: (applicationId) => {
+    const token = localStorage.getItem("token");
+    return `/api/pdf/application-summary/${applicationId}?token=${token}`;
+  },
   downloadURL: (applicationId) => {
     const token = localStorage.getItem("token");
     return `/api/pdf/download/${applicationId}?token=${token}`;
@@ -151,6 +155,11 @@ export const adminAPI = {
   updateApplicationStatus: (id, status) => {
     console.log("🔄 Updating application status:", id, status);
     return api.put(`/admin/applications/${id}/status`, { status });
+  },
+  // ─── ADDED ACTIVITY LOG FUNCTION HERE ──────────────────────────────
+  getActivityLog: (id) => {
+    console.log("📜 Fetching activity log for application:", id);
+    return api.get(`/admin/applications/${id}/activity`);
   },
 };
 

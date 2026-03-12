@@ -249,7 +249,19 @@ const updateApplicationStatus = async (req, res) => {
         .json({ success: false, message: "Application not found" });
     }
 
+    const previousStatus = application.status;
     application.status = status;
+
+    // Log the status change
+    application.activityLog.push({
+      action: "status_changed",
+      by: req.user.email,
+      fromValue: previousStatus,
+      toValue: status,
+      note: `Status changed from "${previousStatus}" to "${status}"`,
+      at: new Date(),
+    });
+
     await application.save();
 
     console.log("✅ Status updated successfully");
@@ -268,7 +280,7 @@ const updateApplicationStatus = async (req, res) => {
 };
 
 /**
- * @desc    Update entire application details (NEW FUNCTION ADDED HERE)
+ * @desc    Update entire application details
  * @route   PUT /api/admin/applications/:id
  * @access  Private (Admin only)
  */
@@ -283,24 +295,67 @@ const updateApplication = async (req, res) => {
     console.log("╚════════════════════════════════════════╝");
     console.log("Application ID:", id);
 
-    // Prevent overriding critical underlying IDs
+    // Prevent overriding critical underlying IDs and timestamps
     delete updateData._id;
     delete updateData.userId;
     delete updateData.applicationNumber;
+    delete updateData.createdAt;
+    delete updateData.updatedAt;
 
-    const application = await Application.findByIdAndUpdate(
-      id,
-      { $set: updateData },
-      { new: true, runValidators: true },
-    ).populate("userId", "name email mobile");
-
+    const application = await Application.findById(id);
     if (!application) {
       return res
         .status(404)
         .json({ success: false, message: "Application not found" });
     }
 
-    console.log("✅ Application updated successfully");
+    // Smarter comparison to find actually changed fields
+    const changedFields = Object.keys(updateData)
+      .filter((k) => !["activityLog", "__v"].includes(k))
+      .filter((k) => {
+        const oldVal = application[k];
+        const newVal = updateData[k];
+
+        // 1. Normalize empty values (treat undefined, null, and "" as exactly the same)
+        const normOld = [undefined, null, ""].includes(oldVal) ? "" : oldVal;
+        const normNew = [undefined, null, ""].includes(newVal) ? "" : newVal;
+
+        // If both are empty after normalization, it hasn't changed
+        if (normOld === "" && normNew === "") return false;
+
+        // 2. Handle Date comparisons safely
+        if (oldVal instanceof Date && newVal) {
+          try {
+            return oldVal.toISOString() !== new Date(newVal).toISOString();
+          } catch (e) {
+            return true; // If parsing fails, flag it as changed just in case
+          }
+        }
+
+        // 3. Standard string comparison for everything else
+        return String(normOld) !== String(normNew);
+      });
+
+    Object.assign(application, updateData);
+
+    // Only log the edit if something ACTUALLY changed
+    if (changedFields.length > 0) {
+      application.activityLog.push({
+        action: "fields_edited",
+        by: req.user.email,
+        fromValue: null,
+        toValue: null,
+        note: `Edited fields: ${changedFields.join(", ")}`,
+        at: new Date(),
+      });
+    }
+
+    await application.save();
+    await application.populate("userId", "name email mobile");
+
+    console.log(
+      `✅ Application updated. Changed fields: ${changedFields.length}`,
+    );
 
     res.status(200).json({
       success: true,
@@ -314,6 +369,43 @@ const updateApplication = async (req, res) => {
       message: "Failed to update application",
       error: error.message,
     });
+  }
+};
+
+/**
+ * @desc    Get activity log for an application
+ * @route   GET /api/admin/applications/:id/activity
+ * @access  Private (Admin only)
+ */
+const getActivityLog = async (req, res) => {
+  try {
+    const Application = require("../models/Application");
+    const application = await Application.findById(req.params.id).select(
+      "activityLog applicationNumber fullName",
+    );
+
+    if (!application) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Application not found" });
+    }
+
+    // Return log newest-first
+    const log = [...application.activityLog].reverse();
+
+    res.status(200).json({
+      success: true,
+      data: {
+        applicationNumber: application.applicationNumber,
+        fullName: application.fullName,
+        log,
+      },
+    });
+  } catch (error) {
+    console.error("Get Activity Log Error:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to fetch activity log" });
   }
 };
 
@@ -426,7 +518,6 @@ const updateSettings = async (req, res) => {
   }
 };
 
-// ADDED updateApplication to the exports below!
 module.exports = {
   adminLogin,
   getStats,
@@ -434,6 +525,7 @@ module.exports = {
   getApplicationById,
   updateApplicationStatus,
   updateApplication,
+  getActivityLog,
   createAdmin,
   getSettings,
   updateSettings,

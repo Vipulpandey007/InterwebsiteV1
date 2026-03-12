@@ -342,6 +342,10 @@ const Dashboard = () => {
     window.open(pdfAPI.downloadURL(application._id), "_blank");
   };
 
+  const handleDownloadSummary = () => {
+    window.open(pdfAPI.applicationSummaryURL(application._id), "_blank");
+  };
+
   const handleLogout = () => {
     logout();
     navigate("/");
@@ -1145,6 +1149,57 @@ const Dashboard = () => {
                 )}
               </TimelineStep>
             </div>
+
+            {/* Download Application Summary */}
+            {application.status !== "draft" && (
+              <div
+                style={{
+                  background: "#F0FDF4",
+                  borderRadius: 12,
+                  border: "1px solid #BBF7D0",
+                  padding: "16px 20px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  flexWrap: "wrap",
+                  gap: 12,
+                }}
+              >
+                <div>
+                  <p
+                    style={{
+                      fontWeight: 700,
+                      color: "#166534",
+                      fontSize: 14,
+                      marginBottom: 4,
+                    }}
+                  >
+                    📋 Application Form Summary
+                  </p>
+                  <p style={{ color: "#15803D", fontSize: 13 }}>
+                    Download a PDF copy of your complete application for your
+                    records.
+                  </p>
+                </div>
+                {/* <button
+                  onClick={handleDownloadSummary}
+                  style={{
+                    background: "#16A34A",
+                    color: "#fff",
+                    border: "none",
+                    padding: "10px 20px",
+                    borderRadius: 8,
+                    fontSize: 13,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    whiteSpace: "nowrap",
+                    boxShadow: "0 2px 8px #16A34A30",
+                  }}
+                >
+                  ⬇️ Download Summary PDF
+                </button> */}
+              </div>
+            )}
 
             {/* Help Card */}
             <div
