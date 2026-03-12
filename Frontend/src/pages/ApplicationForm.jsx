@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { applicationAPI } from "../services/api";
+import { applicationAPI, settingsAPI } from "../services/api";
 import toast from "react-hot-toast";
 
 // Review step components
@@ -14,6 +14,7 @@ const ApplicationForm = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [loading, setLoading] = useState(false);
+  const [portalClosed, setPortalClosed] = useState(null); // null=checking, false=open, object=closed info
   const [currentStep, setCurrentStep] = useState(1);
 
   const [formData, setFormData] = useState({
@@ -63,6 +64,24 @@ const ApplicationForm = () => {
     bplCertificate: null,
     aadharCardDoc: null,
   });
+
+  // ── Check if portal is open (runs first, before anything else) ─────────────
+  useEffect(() => {
+    const checkPortal = async () => {
+      try {
+        const res = await settingsAPI.getSettings();
+        const { isAccepting, closeDate, closedMessage } = res.data.data;
+        if (!isAccepting) {
+          setPortalClosed({ closeDate, closedMessage });
+        } else {
+          setPortalClosed(false);
+        }
+      } catch {
+        setPortalClosed(false); // if check fails, allow form to load
+      }
+    };
+    checkPortal();
+  }, []);
 
   // ── Check for existing active application on mount ──────────────────────
   useEffect(() => {
@@ -415,6 +434,138 @@ const ApplicationForm = () => {
     "Documents",
     "Review",
   ];
+
+  // ── Portal closed screen ────────────────────────────────────────────────────
+  if (portalClosed === null) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "#F8FAFC",
+        }}
+      >
+        <div style={{ textAlign: "center", color: "#64748B" }}>
+          <div style={{ fontSize: 32, marginBottom: 12 }}>⏳</div>
+          <p style={{ fontSize: 15 }}>Checking admission status...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (portalClosed) {
+    const deadline = portalClosed.closeDate
+      ? new Date(portalClosed.closeDate).toLocaleDateString("en-IN", {
+          day: "2-digit",
+          month: "long",
+          year: "numeric",
+        })
+      : null;
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "linear-gradient(135deg, #FEF2F2 0%, #FFF7ED 100%)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "24px",
+        }}
+      >
+        <div
+          style={{
+            background: "#fff",
+            borderRadius: 20,
+            padding: "48px 40px",
+            maxWidth: 480,
+            width: "100%",
+            textAlign: "center",
+            boxShadow: "0 20px 60px rgba(0,0,0,0.08)",
+            border: "1px solid #FEE2E2",
+          }}
+        >
+          <div
+            style={{
+              width: 80,
+              height: 80,
+              background: "linear-gradient(135deg, #FEE2E2, #FECACA)",
+              borderRadius: "50%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              margin: "0 auto 24px",
+              fontSize: 36,
+            }}
+          >
+            🔒
+          </div>
+          <h2
+            style={{
+              fontSize: 24,
+              fontWeight: 800,
+              color: "#1E293B",
+              marginBottom: 12,
+            }}
+          >
+            Applications Closed
+          </h2>
+          <p
+            style={{
+              color: "#64748B",
+              fontSize: 15,
+              lineHeight: 1.7,
+              marginBottom: 24,
+            }}
+          >
+            {portalClosed.closedMessage ||
+              "Applications for this session are currently closed."}
+          </p>
+          {deadline && (
+            <div
+              style={{
+                background: "#FEF2F2",
+                border: "1px solid #FECACA",
+                borderRadius: 10,
+                padding: "12px 20px",
+                marginBottom: 24,
+              }}
+            >
+              <p
+                style={{
+                  color: "#DC2626",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  margin: 0,
+                }}
+              >
+                📅 Deadline was: {deadline}
+              </p>
+            </div>
+          )}
+          <p style={{ color: "#94A3B8", fontSize: 13, marginBottom: 28 }}>
+            Please contact the college office for further information.
+          </p>
+          <button
+            onClick={() => navigate("/dashboard")}
+            style={{
+              background: "#6366F1",
+              color: "#fff",
+              border: "none",
+              padding: "12px 28px",
+              borderRadius: 10,
+              fontSize: 14,
+              fontWeight: 700,
+              cursor: "pointer",
+            }}
+          >
+            ← Back to Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">

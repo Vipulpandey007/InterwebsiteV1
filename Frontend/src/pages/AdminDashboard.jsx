@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { adminAPI } from "../services/api";
+import { adminAPI, settingsAPI } from "../services/api";
 import toast from "react-hot-toast";
 import * as XLSX from "xlsx";
 import ApplicationDetailModal from "../components/admin/ApplicationDetailModal";
 import ApplicationEditModal from "../components/admin/ApplicationEditModal";
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
 const STATUS_META = {
   all: {
@@ -76,7 +76,7 @@ const PayBadge = ({ status }) => {
   );
 };
 
-// ─── Pagination Controls ─────────────────────────────────────────────────────
+// ── Pagination Controls ──────────────────────────────────────────────────────
 
 const Pagination = ({
   page,
@@ -86,40 +86,39 @@ const Pagination = ({
   onPageChange,
   onLimitChange,
 }) => {
-  const getPages = () => {
-    const pages = [];
-    const delta = 2;
-    for (let i = 1; i <= totalPages; i++) {
-      if (
-        i === 1 ||
-        i === totalPages ||
-        (i >= page - delta && i <= page + delta)
-      ) {
-        pages.push(i);
-      }
+  const pages = [];
+  const delta = 2;
+  const left = page - delta;
+  const right = page + delta;
+
+  for (let i = 1; i <= totalPages; i++) {
+    if (i === 1 || i === totalPages || (i >= left && i <= right)) {
+      pages.push(i);
     }
-    const withGaps = [];
-    let prev = 0;
-    for (const p of pages) {
-      if (prev && p - prev > 1) withGaps.push("...");
-      withGaps.push(p);
-      prev = p;
-    }
-    return withGaps;
-  };
+  }
+
+  // Insert ellipsis gaps
+  const withGaps = [];
+  let prev = 0;
+  for (const p of pages) {
+    if (prev && p - prev > 1) withGaps.push("...");
+    withGaps.push(p);
+    prev = p;
+  }
 
   const start = (page - 1) * limit + 1;
   const end = Math.min(page * limit, total);
 
   return (
-    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 bg-white border-t border-gray-100">
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 bg-white border-t border-gray-200">
+      {/* Info + rows per page */}
       <div className="flex items-center gap-4">
-        <span className="text-sm text-gray-500">
+        <span className="text-sm text-gray-600">
           Showing{" "}
-          <span className="font-semibold text-gray-900">
+          <span className="font-semibold">
             {start}–{end}
           </span>{" "}
-          of <span className="font-semibold text-gray-900">{total}</span>
+          of <span className="font-semibold">{total}</span> applications
         </span>
         <div className="flex items-center gap-2">
           <label className="text-sm text-gray-500">Rows:</label>
@@ -137,11 +136,13 @@ const Pagination = ({
         </div>
       </div>
 
+      {/* Page buttons */}
       <div className="flex items-center gap-1">
         <button
           onClick={() => onPageChange(page - 1)}
           disabled={page === 1}
           className="p-2 rounded-md text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+          title="Previous page"
         >
           <svg
             className="w-4 h-4"
@@ -158,7 +159,7 @@ const Pagination = ({
           </svg>
         </button>
 
-        {getPages().map((p, i) =>
+        {withGaps.map((p, i) =>
           p === "..." ? (
             <span key={`gap-${i}`} className="px-2 text-gray-400 select-none">
               …
@@ -182,6 +183,7 @@ const Pagination = ({
           onClick={() => onPageChange(page + 1)}
           disabled={page === totalPages}
           className="p-2 rounded-md text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+          title="Next page"
         >
           <svg
             className="w-4 h-4"
@@ -202,7 +204,7 @@ const Pagination = ({
   );
 };
 
-// ─── Stat Card ───────────────────────────────────────────────────────────────
+// ── Stat Card ────────────────────────────────────────────────────────────────
 
 const StatCard = ({ label, value, icon, color }) => (
   <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex items-center gap-4">
@@ -218,11 +220,12 @@ const StatCard = ({ label, value, icon, color }) => (
   </div>
 );
 
-// ─── Main Component ──────────────────────────────────────────────────────────
+// ── Main Component ───────────────────────────────────────────────────────────
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
 
+  // Stats
   const [stats, setStats] = useState({
     totalApplications: 0,
     pendingApplications: 0,
@@ -232,11 +235,12 @@ const AdminDashboard = () => {
     todayApplications: 0,
   });
 
+  // Table data
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tableLoading, setTableLoading] = useState(false);
 
-  // Pagination state
+  // Pagination
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
   const [total, setTotal] = useState(0);
@@ -251,9 +255,10 @@ const AdminDashboard = () => {
   const [viewApp, setViewApp] = useState(null);
   const [editApp, setEditApp] = useState(null);
 
+  // Export
   const [exporting, setExporting] = useState(false);
 
-  // Debounce search input
+  // Debounce search
   const debounceTimer = useRef(null);
   const handleSearchChange = (value) => {
     setSearchTerm(value);
@@ -264,7 +269,58 @@ const AdminDashboard = () => {
     }, 400);
   };
 
-  // Fetch stats once on mount
+  // ── Admission Settings ────────────────────────────────────────────────────
+  const [showSettings, setShowSettings] = useState(false);
+  const [settings, setSettings] = useState(null);
+  const [settingsForm, setSettingsForm] = useState({
+    session: "2026-27",
+    isOpen: true,
+    openDate: "",
+    closeDate: "",
+    closedMessage: "Applications for this session are now closed.",
+  });
+  const [savingSettings, setSavingSettings] = useState(false);
+
+  const fetchSettings = async () => {
+    try {
+      const res = await settingsAPI.getSettings();
+      const s = res.data.data;
+      setSettings(s);
+      setSettingsForm({
+        session: s.session || "2026-27",
+        isOpen: s.isOpen !== false,
+        openDate: s.openDate ? s.openDate.slice(0, 16) : "",
+        closeDate: s.closeDate ? s.closeDate.slice(0, 16) : "",
+        closedMessage:
+          s.closedMessage || "Applications for this session are now closed.",
+      });
+    } catch {
+      /* silent */
+    }
+  };
+
+  const handleSaveSettings = async () => {
+    setSavingSettings(true);
+    try {
+      const res = await settingsAPI.updateSettings({
+        session: settingsForm.session,
+        isOpen: settingsForm.isOpen,
+        openDate: settingsForm.openDate || null,
+        closeDate: settingsForm.closeDate || null,
+        closedMessage: settingsForm.closedMessage,
+      });
+      if (res.data.success) {
+        setSettings(res.data.data);
+        toast.success("Settings saved!");
+        setShowSettings(false);
+      }
+    } catch {
+      toast.error("Failed to save settings");
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
   useEffect(() => {
     adminAPI
       .getStats()
@@ -273,9 +329,10 @@ const AdminDashboard = () => {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
+    fetchSettings();
   }, []);
 
-  // Fetch applications on page/limit/filter/search change
+  // ── Fetch applications whenever page/limit/filter/search changes ──
   const fetchApplications = useCallback(async () => {
     setTableLoading(true);
     try {
@@ -308,11 +365,13 @@ const AdminDashboard = () => {
     fetchApplications();
   }, [fetchApplications]);
 
+  // Reset to page 1 when filter changes
   const handleStatusFilter = (s) => {
     setStatusFilter(s);
     setPage(1);
   };
 
+  // ── Status update ──
   const handleStatusChange = async (id, newStatus) => {
     try {
       await adminAPI.updateApplicationStatus(id, newStatus);
@@ -323,6 +382,7 @@ const AdminDashboard = () => {
     }
   };
 
+  // ── View / Edit ──
   const handleView = async (id) => {
     try {
       const res = await adminAPI.getApplicationById(id);
@@ -345,6 +405,7 @@ const AdminDashboard = () => {
     toast.success("Application updated");
   };
 
+  // ── Logout ──
   const handleLogout = () => {
     localStorage.removeItem("adminToken");
     localStorage.removeItem("admin");
@@ -352,6 +413,7 @@ const AdminDashboard = () => {
     navigate("/admin/login");
   };
 
+  // ── Export helpers ──
   const buildExportRow = (app) => ({
     "Application No.": app.applicationNumber || "",
     "Applied For": app.appliedFor || "",
@@ -387,7 +449,7 @@ const AdminDashboard = () => {
     "Year of Passing": app.yearOfPassing || "",
     Status: app.status || "",
     "Payment Status": app.paymentStatus || "",
-    "Amount (₹)": app.amount || "",
+    Amount: app.amount || "",
     "Transaction ID": app.transactionId || "",
     "Submitted At": app.createdAt
       ? new Date(app.createdAt).toLocaleDateString("en-IN")
@@ -397,32 +459,40 @@ const AdminDashboard = () => {
   const doExport = async (mode) => {
     setExporting(true);
     try {
-      const res = await adminAPI.getAllApplications({
-        page: 1,
-        limit: 9999,
-        ...(mode === "filtered"
-          ? { status: statusFilter, search: debouncedSearch }
-          : {}),
-      });
-      const rows = res.data.data.applications.map(buildExportRow);
+      let rows = [];
+      if (mode === "filtered") {
+        const res = await adminAPI.getAllApplications({
+          page: 1,
+          limit: 9999,
+          status: statusFilter,
+          search: debouncedSearch,
+        });
+        rows = res.data.data.applications.map(buildExportRow);
+      } else {
+        const res = await adminAPI.getAllApplications({ page: 1, limit: 9999 });
+        rows = res.data.data.applications.map(buildExportRow);
+      }
+
       const ws = XLSX.utils.json_to_sheet(rows);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Applications");
-      XLSX.utils.book_append_sheet(
-        wb,
-        XLSX.utils.json_to_sheet([
-          { Metric: "Total", Value: stats.totalApplications },
-          { Metric: "Pending", Value: stats.pendingApplications },
-          { Metric: "Approved", Value: stats.approvedApplications },
-          { Metric: "Rejected", Value: stats.rejectedApplications },
-          { Metric: "Revenue (₹)", Value: stats.totalRevenue },
-          { Metric: "Exported At", Value: new Date().toLocaleString("en-IN") },
-        ]),
-        "Summary",
-      );
+
+      // Summary sheet
+      const summary = XLSX.utils.json_to_sheet([
+        { Metric: "Total", Value: stats.totalApplications },
+        { Metric: "Pending", Value: stats.pendingApplications },
+        { Metric: "Approved", Value: stats.approvedApplications },
+        { Metric: "Rejected", Value: stats.rejectedApplications },
+        { Metric: "Revenue (₹)", Value: stats.totalRevenue },
+        { Metric: "Today", Value: stats.todayApplications },
+        { Metric: "Exported At", Value: new Date().toLocaleString("en-IN") },
+      ]);
+      XLSX.utils.book_append_sheet(wb, summary, "Summary");
+
+      const date = new Date().toISOString().split("T")[0];
       XLSX.writeFile(
         wb,
-        `GIC_Applications_${mode === "filtered" ? "Filtered" : "All"}_${new Date().toISOString().split("T")[0]}.xlsx`,
+        `GIC_Applications_${mode === "filtered" ? "Filtered" : "All"}_${date}.xlsx`,
       );
       toast.success(`Exported ${rows.length} applications`);
     } catch {
@@ -432,6 +502,7 @@ const AdminDashboard = () => {
     }
   };
 
+  // ── Full page loader ──
   if (loading)
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -446,7 +517,7 @@ const AdminDashboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Navbar */}
+      {/* ── Navbar ── */}
       <nav className="bg-white border-b border-gray-200 sticky top-0 z-30 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -466,6 +537,12 @@ const AdminDashboard = () => {
             <span className="hidden sm:block text-sm text-gray-500">
               {adminEmail}
             </span>
+            <button
+              onClick={() => setShowSettings(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition-colors"
+            >
+              ⚙️ Settings
+            </button>
             <button
               onClick={handleLogout}
               className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors"
@@ -489,9 +566,41 @@ const AdminDashboard = () => {
         </div>
       </nav>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-        {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+        {/* ── Portal Status Banner ── */}
+        {settings && (
+          <div
+            className={`p-4 rounded-xl border-2 flex items-center justify-between ${settings.isAccepting ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"}`}
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">
+                {settings.isAccepting ? "🟢" : "🔴"}
+              </span>
+              <div>
+                <p
+                  className={`font-bold text-sm ${settings.isAccepting ? "text-green-800" : "text-red-800"}`}
+                >
+                  Application Portal is{" "}
+                  {settings.isAccepting ? "OPEN" : "CLOSED"}
+                </p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Session: {settings.session}
+                  {settings.closeDate &&
+                    ` · Deadline: ${new Date(settings.closeDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}`}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowSettings(true)}
+              className="text-sm font-medium text-indigo-600 hover:text-indigo-800 underline"
+            >
+              Edit Settings
+            </button>
+          </div>
+        )}
+
+        {/* ── Stats ── */}
+        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
           <StatCard
             label="Total"
             value={stats.totalApplications}
@@ -614,10 +723,9 @@ const AdminDashboard = () => {
           />
         </div>
 
-        {/* Toolbar */}
+        {/* ── Toolbar ── */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
           <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
-            {/* Status filter tabs */}
             <div className="flex flex-wrap gap-2">
               {Object.entries(STATUS_META).map(([key, meta]) => (
                 <button
@@ -634,7 +742,6 @@ const AdminDashboard = () => {
               ))}
             </div>
 
-            {/* Search + Export */}
             <div className="flex items-center gap-3 w-full lg:w-auto">
               <div className="relative flex-1 lg:w-64">
                 <input
@@ -642,7 +749,7 @@ const AdminDashboard = () => {
                   placeholder="Search name, email, app no…"
                   value={searchTerm}
                   onChange={(e) => handleSearchChange(e.target.value)}
-                  className="w-full pl-9 pr-8 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
                 <svg
                   className="absolute left-3 top-2.5 w-4 h-4 text-gray-400"
@@ -660,7 +767,7 @@ const AdminDashboard = () => {
                 {searchTerm && (
                   <button
                     onClick={() => handleSearchChange("")}
-                    className="absolute right-2.5 top-2.5 text-gray-400 hover:text-gray-600"
+                    className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600"
                   >
                     <svg
                       className="w-4 h-4"
@@ -681,7 +788,7 @@ const AdminDashboard = () => {
               <button
                 onClick={() => doExport("filtered")}
                 disabled={exporting}
-                className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium bg-green-600 hover:bg-green-700 text-white rounded-lg disabled:opacity-60 whitespace-nowrap transition-colors"
+                className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium bg-green-600 hover:bg-green-700 text-white rounded-lg disabled:opacity-60 transition-colors whitespace-nowrap"
               >
                 <svg
                   className="w-4 h-4"
@@ -701,7 +808,7 @@ const AdminDashboard = () => {
               <button
                 onClick={() => doExport("all")}
                 disabled={exporting}
-                className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg disabled:opacity-60 whitespace-nowrap transition-colors"
+                className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg disabled:opacity-60 transition-colors whitespace-nowrap"
               >
                 <svg
                   className="w-4 h-4"
@@ -722,16 +829,15 @@ const AdminDashboard = () => {
           </div>
         </div>
 
-        {/* Table */}
+        {/* ── Table ── */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          {/* Table title */}
           <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
             <h3 className="font-semibold text-gray-900">
               Applications
               {!tableLoading && (
                 <span className="ml-2 text-sm font-normal text-gray-400">
-                  ({total}
-                  {debouncedSearch ? ` matching "${debouncedSearch}"` : ""})
+                  ({total} total
+                  {debouncedSearch ? `, filtered by "${debouncedSearch}"` : ""})
                 </span>
               )}
             </h3>
@@ -754,7 +860,7 @@ const AdminDashboard = () => {
                     App No.
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                    Student
+                    Student Name
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                     Contact / Email
@@ -777,13 +883,13 @@ const AdminDashboard = () => {
                 </tr>
               </thead>
               <tbody
-                className={`divide-y divide-gray-50 transition-opacity duration-150 ${tableLoading ? "opacity-40" : "opacity-100"}`}
+                className={`divide-y divide-gray-50 transition-opacity ${tableLoading ? "opacity-50" : "opacity-100"}`}
               >
                 {applications.length === 0 && !tableLoading ? (
                   <tr>
                     <td colSpan={9} className="px-6 py-16 text-center">
                       <svg
-                        className="w-12 h-12 text-gray-200 mx-auto mb-3"
+                        className="w-12 h-12 text-gray-300 mx-auto mb-3"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -792,22 +898,16 @@ const AdminDashboard = () => {
                           strokeLinecap="round"
                           strokeLinejoin="round"
                           strokeWidth={1.5}
-                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                          d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                         />
                       </svg>
                       <p className="text-gray-400 font-medium">
                         No applications found
                       </p>
                       {(debouncedSearch || statusFilter !== "all") && (
-                        <button
-                          onClick={() => {
-                            handleSearchChange("");
-                            handleStatusFilter("all");
-                          }}
-                          className="mt-2 text-sm text-indigo-500 hover:underline"
-                        >
-                          Clear filters
-                        </button>
+                        <p className="text-gray-400 text-sm mt-1">
+                          Try clearing your search or filter
+                        </p>
                       )}
                     </td>
                   </tr>
@@ -815,13 +915,13 @@ const AdminDashboard = () => {
                   applications.map((app, idx) => (
                     <tr
                       key={app._id}
-                      className="hover:bg-indigo-50/20 transition-colors"
+                      className="hover:bg-indigo-50/30 transition-colors"
                     >
                       <td className="px-4 py-3 text-sm text-gray-400">
                         {(page - 1) * limit + idx + 1}
                       </td>
                       <td className="px-4 py-3">
-                        <span className="text-sm font-mono font-semibold text-indigo-600">
+                        <span className="text-sm font-mono font-medium text-indigo-600">
                           {app.applicationNumber || "—"}
                         </span>
                       </td>
@@ -831,9 +931,7 @@ const AdminDashboard = () => {
                             {app.fullName || "—"}
                           </p>
                           <p className="text-xs text-gray-400">
-                            {[app.category, app.gender]
-                              .filter(Boolean)
-                              .join(" · ")}
+                            {app.category} · {app.gender}
                           </p>
                         </div>
                       </td>
@@ -867,7 +965,7 @@ const AdminDashboard = () => {
                           <button
                             onClick={() => handleView(app._id)}
                             className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors"
-                            title="View"
+                            title="View details"
                           >
                             <svg
                               className="w-4 h-4"
@@ -903,7 +1001,7 @@ const AdminDashboard = () => {
                               }
                             }}
                             className="p-1.5 text-amber-600 hover:bg-amber-50 rounded-md transition-colors"
-                            title="Edit"
+                            title="Edit application"
                           >
                             <svg
                               className="w-4 h-4"
@@ -978,8 +1076,8 @@ const AdminDashboard = () => {
             </table>
           </div>
 
-          {/* Pagination */}
-          {(totalPages > 1 || total > 10) && (
+          {/* ── Pagination ── */}
+          {totalPages > 1 || total > 10 ? (
             <Pagination
               page={page}
               totalPages={totalPages}
@@ -991,11 +1089,11 @@ const AdminDashboard = () => {
                 setPage(1);
               }}
             />
-          )}
+          ) : null}
         </div>
       </div>
 
-      {/* Modals */}
+      {/* ── Modals ── */}
       {viewApp && (
         <ApplicationDetailModal
           application={viewApp}
@@ -1009,6 +1107,285 @@ const AdminDashboard = () => {
           onClose={() => setEditApp(null)}
           onSaved={handleEditSaved}
         />
+      )}
+
+      {/* ── Settings Modal ── */}
+      {showSettings && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.5)",
+            zIndex: 1000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 16,
+          }}
+        >
+          <div
+            style={{
+              background: "#fff",
+              borderRadius: 16,
+              padding: 32,
+              maxWidth: 520,
+              width: "100%",
+              maxHeight: "90vh",
+              overflowY: "auto",
+              boxShadow: "0 25px 60px rgba(0,0,0,0.15)",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 24,
+              }}
+            >
+              <h3
+                style={{
+                  fontSize: 20,
+                  fontWeight: 800,
+                  color: "#1E293B",
+                  margin: 0,
+                }}
+              >
+                ⚙️ Admission Portal Settings
+              </h3>
+              <button
+                onClick={() => setShowSettings(false)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  fontSize: 20,
+                  cursor: "pointer",
+                  color: "#64748B",
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ marginBottom: 20 }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: "#374151",
+                  marginBottom: 6,
+                }}
+              >
+                Academic Session
+              </label>
+              <input
+                type="text"
+                value={settingsForm.session}
+                onChange={(e) =>
+                  setSettingsForm((p) => ({ ...p, session: e.target.value }))
+                }
+                style={{
+                  width: "100%",
+                  padding: "10px 14px",
+                  border: "1.5px solid #E2E8F0",
+                  borderRadius: 8,
+                  fontSize: 14,
+                  boxSizing: "border-box",
+                }}
+                placeholder="e.g. 2026-27"
+              />
+            </div>
+
+            <div
+              style={{
+                marginBottom: 20,
+                padding: 16,
+                background: "#F8FAFC",
+                borderRadius: 10,
+                border: "1.5px solid #E2E8F0",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                <div>
+                  <p
+                    style={{
+                      fontSize: 14,
+                      fontWeight: 700,
+                      color: "#1E293B",
+                      margin: "0 0 4px",
+                    }}
+                  >
+                    Portal Status
+                  </p>
+                  <p style={{ fontSize: 12, color: "#64748B", margin: 0 }}>
+                    Manually open or close regardless of dates
+                  </p>
+                </div>
+                <button
+                  onClick={() =>
+                    setSettingsForm((p) => ({ ...p, isOpen: !p.isOpen }))
+                  }
+                  style={{
+                    padding: "8px 20px",
+                    borderRadius: 20,
+                    border: "none",
+                    fontWeight: 700,
+                    fontSize: 13,
+                    cursor: "pointer",
+                    background: settingsForm.isOpen ? "#DCFCE7" : "#FEE2E2",
+                    color: settingsForm.isOpen ? "#166534" : "#991B1B",
+                  }}
+                >
+                  {settingsForm.isOpen ? "🟢 OPEN" : "🔴 CLOSED"}
+                </button>
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 20 }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: "#374151",
+                  marginBottom: 6,
+                }}
+              >
+                Open Date{" "}
+                <span style={{ color: "#94A3B8", fontWeight: 400 }}>
+                  (optional)
+                </span>
+              </label>
+              <input
+                type="datetime-local"
+                value={settingsForm.openDate}
+                onChange={(e) =>
+                  setSettingsForm((p) => ({ ...p, openDate: e.target.value }))
+                }
+                style={{
+                  width: "100%",
+                  padding: "10px 14px",
+                  border: "1.5px solid #E2E8F0",
+                  borderRadius: 8,
+                  fontSize: 14,
+                  boxSizing: "border-box",
+                }}
+              />
+              <p style={{ fontSize: 11, color: "#94A3B8", margin: "4px 0 0" }}>
+                Portal auto-opens at this time
+              </p>
+            </div>
+
+            <div style={{ marginBottom: 20 }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: "#374151",
+                  marginBottom: 6,
+                }}
+              >
+                Application Deadline{" "}
+                <span style={{ color: "#DC2626", fontWeight: 400 }}>*</span>
+              </label>
+              <input
+                type="datetime-local"
+                value={settingsForm.closeDate}
+                onChange={(e) =>
+                  setSettingsForm((p) => ({ ...p, closeDate: e.target.value }))
+                }
+                style={{
+                  width: "100%",
+                  padding: "10px 14px",
+                  border: "1.5px solid #E2E8F0",
+                  borderRadius: 8,
+                  fontSize: 14,
+                  boxSizing: "border-box",
+                }}
+              />
+              <p style={{ fontSize: 11, color: "#94A3B8", margin: "4px 0 0" }}>
+                Portal auto-closes after this date & time
+              </p>
+            </div>
+
+            <div style={{ marginBottom: 28 }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: "#374151",
+                  marginBottom: 6,
+                }}
+              >
+                Message When Closed
+              </label>
+              <textarea
+                value={settingsForm.closedMessage}
+                onChange={(e) =>
+                  setSettingsForm((p) => ({
+                    ...p,
+                    closedMessage: e.target.value,
+                  }))
+                }
+                rows={3}
+                style={{
+                  width: "100%",
+                  padding: "10px 14px",
+                  border: "1.5px solid #E2E8F0",
+                  borderRadius: 8,
+                  fontSize: 14,
+                  resize: "vertical",
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+
+            <div style={{ display: "flex", gap: 12 }}>
+              <button
+                onClick={() => setShowSettings(false)}
+                style={{
+                  flex: 1,
+                  padding: 11,
+                  border: "1.5px solid #E2E8F0",
+                  borderRadius: 8,
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  background: "#fff",
+                  color: "#374151",
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveSettings}
+                disabled={savingSettings}
+                style={{
+                  flex: 2,
+                  padding: 11,
+                  border: "none",
+                  borderRadius: 8,
+                  fontSize: 14,
+                  fontWeight: 700,
+                  cursor: savingSettings ? "not-allowed" : "pointer",
+                  background: savingSettings ? "#A5B4FC" : "#6366F1",
+                  color: "#fff",
+                }}
+              >
+                {savingSettings ? "Saving..." : "Save Settings"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -1,3 +1,4 @@
+const AdmissionSettings = require("../models/AdmissionSettings");
 const Application = require("../models/Application");
 
 /**
@@ -15,6 +16,27 @@ const createApplication = async (req, res) => {
     console.log("Files:", req.files);
 
     // Check if user already has an application
+    // ── Check if portal is accepting applications ──────────────────────────
+    const settings = await AdmissionSettings.getSettings();
+    if (!settings.isAccepting) {
+      const closeInfo = settings.closeDate
+        ? ` The deadline was ${new Date(settings.closeDate).toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" })}.`
+        : "";
+      return res.status(403).json({
+        success: false,
+        code: "PORTAL_CLOSED",
+        message:
+          (settings.closedMessage || "Applications are currently closed.") +
+          closeInfo,
+        data: {
+          isOpen: settings.isOpen,
+          openDate: settings.openDate,
+          closeDate: settings.closeDate,
+          closedMessage: settings.closedMessage,
+        },
+      });
+    }
+
     const existingApplication = await Application.findOne({
       userId: req.user.id,
     });
