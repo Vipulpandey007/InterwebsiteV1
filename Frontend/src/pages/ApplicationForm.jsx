@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { applicationAPI } from "../services/api";
 import toast from "react-hot-toast";
 
@@ -12,6 +12,7 @@ import ReviewDocuments from "../components/review/ReviewDocuments";
 
 const ApplicationForm = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [loading, setLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
 
@@ -62,6 +63,105 @@ const ApplicationForm = () => {
     bplCertificate: null,
     aadharCardDoc: null,
   });
+
+  // ── Check for existing active application on mount ──────────────────────
+  useEffect(() => {
+    const { editMode } = location.state || {};
+    if (editMode) return; // skip duplicate check when editing
+
+    const checkExistingApplication = async () => {
+      try {
+        const response = await applicationAPI.getMyApplications();
+        const apps = response.data.data?.applications || [];
+        const activeApp = apps.find(
+          (app) => !["rejected"].includes(app.status),
+        );
+        if (activeApp) {
+          toast(
+            (t) => (
+              <div>
+                <p className="font-semibold text-gray-800 mb-1">
+                  Application Already Exists
+                </p>
+                <p className="text-sm text-gray-600 mb-2">
+                  You already have an active application.
+                </p>
+                <p className="text-xs text-gray-500 mb-3">
+                  Ref:{" "}
+                  <span className="font-mono font-medium">
+                    {activeApp.applicationNumber}
+                  </span>{" "}
+                  — Status:{" "}
+                  <span className="capitalize font-medium">
+                    {activeApp.status}
+                  </span>
+                </p>
+                <button
+                  onClick={() => {
+                    toast.dismiss(t.id);
+                    navigate("/dashboard");
+                  }}
+                  className="w-full bg-blue-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-blue-700"
+                >
+                  Go to My Dashboard →
+                </button>
+              </div>
+            ),
+            { duration: 10000, icon: "📋" },
+          );
+          navigate("/dashboard");
+        }
+      } catch {
+        /* silent */
+      }
+    };
+    checkExistingApplication();
+  }, []);
+
+  // ── Prefill form when editing an existing draft ──────────────────────────
+  useEffect(() => {
+    const { applicationId, editMode } = location.state || {};
+    if (!editMode || !applicationId) return;
+
+    const loadDraft = async () => {
+      try {
+        const res = await applicationAPI.getById(applicationId);
+        const app = res.data.data?.application;
+        if (!app) return;
+
+        const skip = new Set([
+          "_id",
+          "__v",
+          "userId",
+          "applicationNumber",
+          "createdAt",
+          "updatedAt",
+          "documents",
+          "status",
+          "paymentStatus",
+          "amount",
+          "transactionId",
+          "razorpayOrderId",
+          "razorpayPaymentId",
+          "admitCardGenerated",
+        ]);
+
+        setFormData((prev) => {
+          const next = { ...prev };
+          Object.keys(app).forEach((key) => {
+            if (!skip.has(key) && app[key] !== undefined && app[key] !== null) {
+              next[key] = app[key];
+            }
+          });
+          return next;
+        });
+        toast.success("Draft loaded — continue editing.", { icon: "✏️" });
+      } catch {
+        toast.error("Failed to load existing application.");
+      }
+    };
+    loadDraft();
+  }, [location.state]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -223,6 +323,8 @@ const ApplicationForm = () => {
       return;
     }
 
+    const { applicationId, editMode } = location.state || {};
+
     setLoading(true);
     try {
       const submitData = new FormData();
@@ -237,13 +339,66 @@ const ApplicationForm = () => {
         }
       });
 
-      const response = await applicationAPI.createWithFiles(submitData);
-      if (response.data.success) {
-        toast.success("Application submitted successfully!");
-        navigate("/dashboard");
+      if (editMode && applicationId) {
+        // Edit mode: update the existing draft, then submit it
+        const updateRes = await applicationAPI.updateWithFiles(
+          applicationId,
+          submitData,
+        );
+        if (!updateRes.data.success) throw new Error("Update failed");
+        const submitRes = await applicationAPI.submit(applicationId);
+        if (submitRes.data.success) {
+          toast.success("Application submitted successfully!");
+          navigate("/dashboard", { replace: true });
+        }
+      } else {
+        // New application: create then submit
+        const createRes = await applicationAPI.createWithFiles(submitData);
+        if (createRes.data.success) {
+          const newId = createRes.data.data?.application?._id;
+          if (newId) await applicationAPI.submit(newId);
+          toast.success("Application submitted successfully!");
+          navigate("/dashboard", { replace: true });
+        }
       }
     } catch (error) {
       console.error("Submit error:", error);
+      if (error.response?.status === 409) {
+        const { message, existing } = error.response.data;
+        toast(
+          (t) => (
+            <div>
+              <p className="font-semibold text-gray-800 mb-1">
+                Application Already Exists
+              </p>
+              <p className="text-sm text-gray-600 mb-3">{message}</p>
+              {existing?.applicationNumber && (
+                <p className="text-xs text-gray-500 mb-3">
+                  Ref:{" "}
+                  <span className="font-mono font-medium">
+                    {existing.applicationNumber}
+                  </span>{" "}
+                  — Status:{" "}
+                  <span className="capitalize font-medium">
+                    {existing.status}
+                  </span>
+                </p>
+              )}
+              <button
+                onClick={() => {
+                  toast.dismiss(t.id);
+                  navigate("/dashboard");
+                }}
+                className="w-full bg-blue-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-blue-700"
+              >
+                Go to My Dashboard →
+              </button>
+            </div>
+          ),
+          { duration: 10000, icon: "📋" },
+        );
+        return;
+      }
       toast.error(
         error.response?.data?.message || "Failed to submit application",
       );

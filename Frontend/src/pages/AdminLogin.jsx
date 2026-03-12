@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { authAPI } from "../services/api";
 import toast from "react-hot-toast";
@@ -6,24 +6,62 @@ import toast from "react-hot-toast";
 const AdminLogin = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    email: "",
-    password: "",
-  });
+  const [formData, setFormData] = useState({ email: "", password: "" });
+
+  // ── Rate limit / lockout state ────────────────────────────────────────────
+  const [rateLimited, setRateLimited] = useState(false);
+  const [rateLimitSeconds, setRateLimitSeconds] = useState(0);
+  const [rateLimitMessage, setRateLimitMessage] = useState("");
+  const [attemptCount, setAttemptCount] = useState(0);
+  const [loginError, setLoginError] = useState(""); // ← inline error
+  const rlTimerRef = useRef(null);
+
+  // Countdown timer
+  useEffect(() => {
+    if (rateLimitSeconds <= 0) {
+      setRateLimited(false);
+      return;
+    }
+    rlTimerRef.current = setInterval(() => {
+      setRateLimitSeconds((s) => {
+        if (s <= 1) {
+          clearInterval(rlTimerRef.current);
+          setRateLimited(false);
+          return 0;
+        }
+        return s - 1;
+      });
+    }, 1000);
+    return () => clearInterval(rlTimerRef.current);
+  }, [rateLimitSeconds]);
+
+  const handle429 = (error) => {
+    if (error.response?.status === 429) {
+      const seconds = error.response.data?.retryAfter || 900;
+      const message =
+        error.response.data?.message ||
+        "Too many failed attempts. Please wait.";
+      setRateLimited(true);
+      setRateLimitSeconds(seconds);
+      setRateLimitMessage(message);
+      return true;
+    }
+    return false;
+  };
+
+  const formatTime = (s) => {
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return m > 0 ? `${m}m ${sec < 10 ? "0" : ""}${sec}s` : `${sec}s`;
+  };
 
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+    if (loginError) setLoginError(""); // clear error on new input
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    console.log("🔐 Admin Login - Starting...");
-    console.log("📧 Email:", formData.email);
-
     if (!formData.email || !formData.password) {
       toast.error("Please fill all fields");
       return;
@@ -31,48 +69,38 @@ const AdminLogin = () => {
 
     setLoading(true);
     try {
-      console.log("📡 Sending login request...");
       const response = await authAPI.adminLogin(formData);
-
-      console.log("📦 Response received:", response.data);
 
       if (response.data.success) {
         const { token, admin } = response.data.data;
-
-        console.log("✅ Login successful!");
-        console.log("🎫 Token:", token ? "RECEIVED" : "MISSING");
-        console.log("👤 Admin:", admin);
-
-        // CRITICAL: Save token to localStorage
         localStorage.setItem("adminToken", token);
         localStorage.setItem("admin", JSON.stringify(admin));
-
-        console.log("💾 Saved to localStorage:");
-        console.log(
-          "  - adminToken:",
-          localStorage.getItem("adminToken") ? "SAVED" : "FAILED",
-        );
-        console.log(
-          "  - admin:",
-          localStorage.getItem("admin") ? "SAVED" : "FAILED",
-        );
-
+        setAttemptCount(0);
+        setLoginError("");
         toast.success("Login successful!");
-
-        console.log("🔄 Redirecting to dashboard...");
         navigate("/admin/dashboard");
       } else {
-        console.error("❌ Login failed:", response.data.message);
-        toast.error(response.data.message || "Login failed");
+        const msg = response.data.message || "Invalid email or password";
+        setLoginError(msg);
+        toast.error(msg);
       }
     } catch (error) {
-      console.error("❌ Login error:", error);
-      console.error("Response:", error.response?.data);
-      toast.error(error.response?.data?.message || "Login failed");
+      if (!handle429(error)) {
+        const newCount = attemptCount + 1;
+        setAttemptCount(newCount);
+        const msg =
+          error.response?.data?.message || "Invalid email or password";
+        setLoginError(msg);
+        toast.error(msg);
+      }
     } finally {
       setLoading(false);
     }
   };
+
+  // Attempts remaining warning (shows after 6 failures, limit is 10)
+  const attemptsRemaining = 10 - attemptCount;
+  const showAttemptWarning = !rateLimited && attemptCount >= 6;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
@@ -100,8 +128,63 @@ const AdminLogin = () => {
           </p>
         </div>
 
-        {/* Login Form */}
+        {/* Card */}
         <div className="bg-white rounded-lg shadow-xl p-8">
+          {/* ── Lockout Banner ────────────────────────────────────────────── */}
+          {rateLimited && (
+            <div className="mb-6 p-4 bg-red-50 border-2 border-red-200 rounded-xl">
+              <div className="flex items-center gap-3 mb-2">
+                <span className="text-2xl">🔒</span>
+                <p className="text-red-700 font-bold text-sm">
+                  Account Temporarily Locked
+                </p>
+              </div>
+              <p className="text-red-600 text-sm mb-3">{rateLimitMessage}</p>
+              <div className="flex items-center gap-2 bg-red-100 rounded-lg px-3 py-2">
+                <svg
+                  className="w-4 h-4 text-red-500 flex-shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+                <span className="text-red-700 text-sm">
+                  Unlocks in{" "}
+                  <span className="font-bold tabular-nums text-red-800">
+                    {formatTime(rateLimitSeconds)}
+                  </span>
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* ── Attempt Warning (6–9 failures) ───────────────────────────── */}
+          {showAttemptWarning && (
+            <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-2">
+              <span className="text-lg">⚠️</span>
+              <p className="text-amber-800 text-sm font-medium">
+                {attemptsRemaining} attempt{attemptsRemaining !== 1 ? "s" : ""}{" "}
+                remaining before 15-minute lockout
+              </p>
+            </div>
+          )}
+
+          {/* ── Inline Error Banner (wrong password / invalid credentials) ─ */}
+          {loginError && !rateLimited && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-300 rounded-lg flex items-start gap-3">
+              <span className="text-red-500 text-lg leading-none mt-0.5">
+                ✗
+              </span>
+              <p className="text-red-700 text-sm font-medium">{loginError}</p>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <label
@@ -120,6 +203,7 @@ const AdminLogin = () => {
                 onChange={handleChange}
                 className="input-field"
                 placeholder="admin@gcraninter.org"
+                disabled={loading || rateLimited}
               />
             </div>
 
@@ -140,6 +224,7 @@ const AdminLogin = () => {
                 onChange={handleChange}
                 className="input-field"
                 placeholder="Enter your password"
+                disabled={loading || rateLimited}
               />
             </div>
 
@@ -158,7 +243,6 @@ const AdminLogin = () => {
                   Remember me
                 </label>
               </div>
-
               <div className="text-sm">
                 <a
                   href="#"
@@ -171,13 +255,12 @@ const AdminLogin = () => {
 
             <button
               type="submit"
-              disabled={loading}
-              className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={loading || rateLimited}
+              className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {loading ? (
                 <svg
                   className="animate-spin h-5 w-5 text-white"
-                  xmlns="http://www.w3.org/2000/svg"
                   fill="none"
                   viewBox="0 0 24 24"
                 >
@@ -188,13 +271,15 @@ const AdminLogin = () => {
                     r="10"
                     stroke="currentColor"
                     strokeWidth="4"
-                  ></circle>
+                  />
                   <path
                     className="opacity-75"
                     fill="currentColor"
                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  ></path>
+                  />
                 </svg>
+              ) : rateLimited ? (
+                `🔒 Locked — ${formatTime(rateLimitSeconds)}`
               ) : (
                 "Sign In"
               )}
@@ -204,7 +289,7 @@ const AdminLogin = () => {
           <div className="mt-6">
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300"></div>
+                <div className="w-full border-t border-gray-300" />
               </div>
               <div className="relative flex justify-center text-sm">
                 <span className="px-2 bg-white text-gray-500">
@@ -212,7 +297,6 @@ const AdminLogin = () => {
                 </span>
               </div>
             </div>
-
             <div className="mt-6">
               <button
                 onClick={() => navigate("/login")}
@@ -224,7 +308,6 @@ const AdminLogin = () => {
           </div>
         </div>
 
-        {/* Footer */}
         <p className="mt-8 text-center text-sm text-gray-600">
           © 2026 Gossner Intermediate College. All rights reserved.
         </p>

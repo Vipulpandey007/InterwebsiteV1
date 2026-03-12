@@ -6,7 +6,7 @@ export default function ReviewBasicInfo({ formData }) {
     <ReviewSection title="Basic Information" icon="📋">
       <ReviewField label="Applied For (Stream)" value={formData.appliedFor} />
       <ReviewField label="Session" value={formData.session} />
-      <ReviewField label="Reference Number" value={formData.referenceNumber} />
+      {/* <ReviewField label="Reference Number" value={formData.referenceNumber} /> */}
     </ReviewSection>
   );
 }

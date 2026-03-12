@@ -11,34 +11,22 @@ const {
   deleteApplication,
 } = require("../controllers/applicationController");
 
-// @route   POST /api/applications
-// @desc    Create new application with file uploads
-// @access  Private
+// ── Create new application (with file uploads) ──────────────────────────────
 router.post("/", protect, uploadFields, createApplication);
 
-// @route   GET /api/applications/my-applications
-// @desc    Get logged in user's applications
-// @access  Private
+// ── Get student's own applications ──────────────────────────────────────────
 router.get("/my-applications", protect, getMyApplications);
 
-// @route   GET /api/applications/:id
-// @desc    Get application by ID
-// @access  Private
+// ── Get single application ───────────────────────────────────────────────────
 router.get("/:id", protect, getApplicationById);
 
-// @route   PUT /api/applications/:id
-// @desc    Update application
-// @access  Private
-router.put("/:id", protect, updateApplication);
+// ── Update draft application (with optional file uploads) ───────────────────
+router.put("/:id", protect, uploadFields, updateApplication);
 
-// @route   POST /api/applications/:id/submit
-// @desc    Submit application
-// @access  Private
+// ── Submit application (changes status draft → submitted) ───────────────────
 router.post("/:id/submit", protect, submitApplication);
 
-// @route   DELETE /api/applications/:id
-// @desc    Delete application
-// @access  Private
+// ── Delete draft application ─────────────────────────────────────────────────
 router.delete("/:id", protect, deleteApplication);
 
 module.exports = router;

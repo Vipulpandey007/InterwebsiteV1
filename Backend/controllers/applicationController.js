@@ -187,25 +187,44 @@ const updateApplication = async (req, res) => {
       });
     }
 
-    // Don't allow updates if already submitted
-    if (application.status !== "draft") {
+    // Block edits once payment is completed or admin has acted
+    if (application.paymentStatus === "completed") {
       return res.status(400).json({
         success: false,
-        message: "Cannot update submitted application",
+        message: "Cannot edit application after payment is completed.",
+      });
+    }
+    if (["approved", "rejected"].includes(application.status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Cannot edit application after it has been reviewed.",
       });
     }
 
-    application = await Application.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-      runValidators: true,
-    });
+    // Build $set object — never mix parent key "documents" with dot-notation
+    // "documents.fieldName" in the same update or MongoDB throws a conflict error.
+    const setFields = { ...req.body };
+
+    // Remove the top-level "documents" key if FormData accidentally sent it
+    delete setFields.documents;
+
+    // Merge uploaded files using dot-notation only
+    if (req.files && Object.keys(req.files).length > 0) {
+      Object.keys(req.files).forEach((fieldName) => {
+        setFields[`documents.${fieldName}`] = req.files[fieldName][0].filename;
+      });
+    }
+
+    application = await Application.findByIdAndUpdate(
+      req.params.id,
+      { $set: setFields },
+      { new: true, runValidators: true },
+    );
 
     res.status(200).json({
       success: true,
       message: "Application updated successfully",
-      data: {
-        application,
-      },
+      data: { application },
     });
   } catch (error) {
     console.error("Update Application Error:", error);
@@ -240,11 +259,17 @@ const submitApplication = async (req, res) => {
       });
     }
 
-    // Check if already submitted
-    if (application.status !== "draft") {
+    // Block re-submission only if payment done or admin has acted
+    if (application.paymentStatus === "completed") {
       return res.status(400).json({
         success: false,
-        message: "Application already submitted",
+        message: "Application already paid — cannot resubmit.",
+      });
+    }
+    if (["approved", "rejected"].includes(application.status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Application has already been reviewed.",
       });
     }
 

@@ -172,6 +172,7 @@ const TimelineStep = ({ num, title, subtitle, status, children }) => {
 
 // ─── Document checklist ───────────────────────────────────────────────────────
 const DOCS = [
+  { key: "studentPhoto", label: "Passport Photo", required: true },
   { key: "tenthMarksheet", label: "10th Marksheet", required: true },
   { key: "tenthAdmitCard", label: "10th Admit Card", required: true },
   { key: "transferCertificate", label: "Transfer Certificate", required: true },
@@ -363,11 +364,12 @@ const Dashboard = () => {
     }
     if (step === 3) {
       if (paymentStatus !== "completed") return "locked";
-      if (status === "approved") return "done";
+      if (status === "approved" || status === "rejected") return "done";
       return "active";
     }
     if (step === 4) {
-      if (status !== "approved") return "locked";
+      // PDF available after payment — no admin approval required
+      if (paymentStatus !== "completed") return "locked";
       if (admitCardGenerated) return "done";
       return "active";
     }
@@ -627,7 +629,7 @@ const Dashboard = () => {
         >
           <p style={{ color: "#059669", fontWeight: 600, fontSize: 14 }}>
             🎉 Congratulations! Your application has been approved. Please
-            download your admit card below.
+            download your application form below.
           </p>
         </div>
       )}
@@ -807,47 +809,57 @@ const Dashboard = () => {
                 num={1}
                 title="Fill & Submit Application"
                 subtitle={
-                  application.status === "draft"
-                    ? "Complete your application form and submit it."
+                  ["draft", "submitted"].includes(application.status) &&
+                  application.paymentStatus !== "completed"
+                    ? "Complete or edit your application form."
                     : `Submitted on ${application.createdAt ? new Date(application.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"}`
                 }
                 status={getStepStatus(1)}
               >
-                {application.status === "draft" && (
-                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                    <button
-                      onClick={() => navigate("/apply")}
-                      style={{
-                        background: "#EEF2FF",
-                        color: "#6366F1",
-                        border: "none",
-                        padding: "9px 18px",
-                        borderRadius: 8,
-                        fontSize: 13,
-                        fontWeight: 700,
-                        cursor: "pointer",
-                      }}
-                    >
-                      ✏️ Edit Application
-                    </button>
-                    <button
-                      onClick={handleSubmitApplication}
-                      style={{
-                        background: "#6366F1",
-                        color: "#fff",
-                        border: "none",
-                        padding: "9px 18px",
-                        borderRadius: 8,
-                        fontSize: 13,
-                        fontWeight: 700,
-                        cursor: "pointer",
-                        boxShadow: "0 2px 8px #6366F140",
-                      }}
-                    >
-                      📤 Submit Application
-                    </button>
-                  </div>
-                )}
+                {application.paymentStatus !== "completed" &&
+                  application.status !== "approved" &&
+                  application.status !== "rejected" && (
+                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                      <button
+                        onClick={() =>
+                          navigate("/apply", {
+                            state: {
+                              applicationId: application._id,
+                              editMode: true,
+                            },
+                          })
+                        }
+                        style={{
+                          background: "#EEF2FF",
+                          color: "#6366F1",
+                          border: "none",
+                          padding: "9px 18px",
+                          borderRadius: 8,
+                          fontSize: 13,
+                          fontWeight: 700,
+                          cursor: "pointer",
+                        }}
+                      >
+                        ✏️ Edit Application
+                      </button>
+                      <button
+                        onClick={handleSubmitApplication}
+                        style={{
+                          background: "#6366F1",
+                          color: "#fff",
+                          border: "none",
+                          padding: "9px 18px",
+                          borderRadius: 8,
+                          fontSize: 13,
+                          fontWeight: 700,
+                          cursor: "pointer",
+                          boxShadow: "0 2px 8px #6366F140",
+                        }}
+                      >
+                        📤 Submit Application
+                      </button>
+                    </div>
+                  )}
               </TimelineStep>
 
               <StepLine done={getStepStatus(1) === "done"} />
@@ -1060,17 +1072,17 @@ const Dashboard = () => {
               {/* STEP 4: Download Admit Card */}
               <TimelineStep
                 num={4}
-                title="Download Admit Card"
+                title="Download Application Form"
                 subtitle={
-                  application.status !== "approved"
+                  application.paymentStatus !== "completed"
                     ? "Available after application approval."
                     : application.admitCardGenerated
-                      ? "Your admit card is ready to download."
-                      : "Click below to generate your admit card."
+                      ? "Your application form is ready to download."
+                      : "Click below to generate your application form."
                 }
                 status={getStepStatus(4)}
               >
-                {application.status === "approved" && (
+                {application.paymentStatus === "completed" && (
                   <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                     {application.admitCardGenerated ? (
                       <>
@@ -1088,7 +1100,7 @@ const Dashboard = () => {
                             boxShadow: "0 2px 8px #6366F140",
                           }}
                         >
-                          ⬇️ Download Admit Card
+                          ⬇️ Download Application Form
                         </button>
                         <button
                           onClick={handleGeneratePDF}
@@ -1124,7 +1136,9 @@ const Dashboard = () => {
                           opacity: pdfLoading ? 0.7 : 1,
                         }}
                       >
-                        {pdfLoading ? "Generating…" : "📄 Generate Admit Card"}
+                        {pdfLoading
+                          ? "Generating…"
+                          : "📄 Generate Application Form"}
                       </button>
                     )}
                   </div>
@@ -1364,23 +1378,32 @@ const Dashboard = () => {
               <h3 style={{ fontSize: 17, fontWeight: 800, color: "#1E293B" }}>
                 Uploaded Documents
               </h3>
-              {application.status === "draft" && (
-                <button
-                  onClick={() => navigate("/apply")}
-                  style={{
-                    background: "#EEF2FF",
-                    color: "#6366F1",
-                    border: "none",
-                    padding: "8px 16px",
-                    borderRadius: 8,
-                    fontSize: 13,
-                    fontWeight: 700,
-                    cursor: "pointer",
-                  }}
-                >
-                  ✏️ Edit Documents
-                </button>
-              )}
+              {application.paymentStatus !== "completed" &&
+                application.status !== "approved" &&
+                application.status !== "rejected" && (
+                  <button
+                    onClick={() =>
+                      navigate("/apply", {
+                        state: {
+                          applicationId: application._id,
+                          editMode: true,
+                        },
+                      })
+                    }
+                    style={{
+                      background: "#EEF2FF",
+                      color: "#6366F1",
+                      border: "none",
+                      padding: "8px 16px",
+                      borderRadius: 8,
+                      fontSize: 13,
+                      fontWeight: 700,
+                      cursor: "pointer",
+                    }}
+                  >
+                    ✏️ Edit Documents
+                  </button>
+                )}
             </div>
 
             <DocumentChecklist documents={application.documents} />

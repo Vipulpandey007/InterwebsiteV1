@@ -103,6 +103,16 @@ export const applicationAPI = {
   getMyApplications: () => api.get("/applications/my-applications"),
   getById: (id) => api.get(`/applications/${id}`),
   update: (id, data) => api.put(`/applications/${id}`, data),
+  updateWithFiles: (id, formData) => {
+    const token = localStorage.getItem("token");
+    return axios.put(`/api/applications/${id}`, formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+        Authorization: `Bearer ${token}`,
+      },
+      timeout: 30000,
+    });
+  },
   submit: (id) => api.post(`/applications/${id}/submit`),
   delete: (id) => api.delete(`/applications/${id}`),
 };

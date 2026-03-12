@@ -1,48 +1,96 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { authAPI } from "../services/api";
 import toast from "react-hot-toast";
 
 const SignupPage = () => {
-  const [step, setStep] = useState(1); // 1: signup form, 2: OTP verification
+  const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { login } = useAuth();
 
-  // Form data
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    mobile: "",
-  });
-
+  const [formData, setFormData] = useState({ name: "", email: "", mobile: "" });
   const [otp, setOtp] = useState("");
   const [userId, setUserId] = useState("");
 
-  // Handle input change
-  const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
+  // ── Rate limit state ──────────────────────────────────────────────────────
+  const [rateLimited, setRateLimited] = useState(false);
+  const [rateLimitSeconds, setRateLimitSeconds] = useState(0);
+  const [rateLimitMessage, setRateLimitMessage] = useState("");
+
+  // ── Resend cooldown (30s) ─────────────────────────────────────────────────
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const rlTimerRef = useRef(null);
+  const rsTimerRef = useRef(null);
+
+  // Rate limit countdown
+  useEffect(() => {
+    if (rateLimitSeconds <= 0) {
+      setRateLimited(false);
+      return;
+    }
+    rlTimerRef.current = setInterval(() => {
+      setRateLimitSeconds((s) => {
+        if (s <= 1) {
+          clearInterval(rlTimerRef.current);
+          setRateLimited(false);
+          return 0;
+        }
+        return s - 1;
+      });
+    }, 1000);
+    return () => clearInterval(rlTimerRef.current);
+  }, [rateLimitSeconds]);
+
+  // Resend cooldown countdown
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    rsTimerRef.current = setInterval(() => {
+      setResendCooldown((s) => {
+        if (s <= 1) {
+          clearInterval(rsTimerRef.current);
+          return 0;
+        }
+        return s - 1;
+      });
+    }, 1000);
+    return () => clearInterval(rsTimerRef.current);
+  }, [resendCooldown]);
+
+  const handle429 = (error) => {
+    if (error.response?.status === 429) {
+      const seconds = error.response.data?.retryAfter || 900;
+      const message =
+        error.response.data?.message || "Too many requests. Please wait.";
+      setRateLimited(true);
+      setRateLimitSeconds(seconds);
+      setRateLimitMessage(message);
+      return true;
+    }
+    return false;
   };
 
-  // Step 1: Signup with name, email, mobile
+  const formatTime = (s) => {
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return m > 0 ? `${m}m ${sec < 10 ? "0" : ""}${sec}s` : `${sec}s`;
+  };
+
+  const handleChange = (e) =>
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+
+  // Step 1: Signup
   const handleSignup = async (e) => {
     e.preventDefault();
-
-    // Validation
     if (!formData.name || formData.name.length < 2) {
       toast.error("Please enter your full name");
       return;
     }
-
     if (!/^\S+@\S+\.\S+$/.test(formData.email)) {
       toast.error("Please enter a valid email address");
       return;
     }
-
     if (formData.mobile.length !== 10) {
       toast.error("Please enter a valid 10-digit mobile number");
       return;
@@ -54,10 +102,13 @@ const SignupPage = () => {
       if (response.data.success) {
         toast.success("OTP sent to your mobile number!");
         setUserId(response.data.data.userId);
-        setStep(2); // Move to OTP verification
+        setStep(2);
+        setResendCooldown(30);
       }
     } catch (error) {
-      toast.error(error.response?.data?.message || "Signup failed");
+      if (!handle429(error)) {
+        toast.error(error.response?.data?.message || "Signup failed");
+      }
     } finally {
       setLoading(false);
     }
@@ -66,12 +117,10 @@ const SignupPage = () => {
   // Step 2: Verify OTP
   const handleVerifyOTP = async (e) => {
     e.preventDefault();
-
     if (otp.length !== 6) {
       toast.error("Please enter a valid 6-digit OTP");
       return;
     }
-
     setLoading(true);
     try {
       const response = await authAPI.verifySignup(formData.mobile, otp);
@@ -82,7 +131,9 @@ const SignupPage = () => {
         navigate("/dashboard");
       }
     } catch (error) {
-      toast.error(error.response?.data?.message || "Invalid OTP");
+      if (!handle429(error)) {
+        toast.error(error.response?.data?.message || "Invalid OTP");
+      }
     } finally {
       setLoading(false);
     }
@@ -90,12 +141,16 @@ const SignupPage = () => {
 
   // Resend OTP
   const handleResendOTP = async () => {
+    if (resendCooldown > 0 || rateLimited) return;
     setLoading(true);
     try {
       await authAPI.resendOTP(formData.mobile);
       toast.success("OTP resent successfully!");
+      setResendCooldown(30);
     } catch (error) {
-      toast.error("Failed to resend OTP");
+      if (!handle429(error)) {
+        toast.error("Failed to resend OTP");
+      }
     } finally {
       setLoading(false);
     }
@@ -125,7 +180,7 @@ const SignupPage = () => {
           Back to Home
         </button>
 
-        {/* Signup Card */}
+        {/* Card */}
         <div className="bg-white rounded-2xl shadow-2xl p-8">
           {/* Header */}
           <div className="text-center mb-8">
@@ -139,6 +194,24 @@ const SignupPage = () => {
                 : "Enter the OTP sent to your mobile"}
             </p>
           </div>
+
+          {/* ── Rate Limit Banner ──────────────────────────────────────────── */}
+          {rateLimited && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
+              <span className="text-2xl flex-shrink-0">🚫</span>
+              <div className="flex-1">
+                <p className="text-red-700 font-semibold text-sm">
+                  {rateLimitMessage}
+                </p>
+                <p className="text-red-500 text-sm mt-1">
+                  Try again in{" "}
+                  <span className="font-bold text-red-700 tabular-nums">
+                    {formatTime(rateLimitSeconds)}
+                  </span>
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Step 1: Signup Form */}
           {step === 1 && (
@@ -155,7 +228,7 @@ const SignupPage = () => {
                   className="input-field"
                   placeholder="Enter your full name"
                   required
-                  disabled={loading}
+                  disabled={loading || rateLimited}
                 />
               </div>
 
@@ -171,7 +244,7 @@ const SignupPage = () => {
                   className="input-field"
                   placeholder="your.email@example.com"
                   required
-                  disabled={loading}
+                  disabled={loading || rateLimited}
                 />
               </div>
 
@@ -198,7 +271,7 @@ const SignupPage = () => {
                     className="input-field pl-14"
                     placeholder="9876543210"
                     required
-                    disabled={loading}
+                    disabled={loading || rateLimited}
                   />
                 </div>
               </div>
@@ -206,7 +279,7 @@ const SignupPage = () => {
               <button
                 type="submit"
                 className="btn-primary w-full"
-                disabled={loading}
+                disabled={loading || rateLimited}
               >
                 {loading ? (
                   <span className="flex items-center justify-center gap-2">
@@ -228,6 +301,8 @@ const SignupPage = () => {
                     </svg>
                     Creating Account...
                   </span>
+                ) : rateLimited ? (
+                  `Wait ${formatTime(rateLimitSeconds)}`
                 ) : (
                   "Create Account & Send OTP"
                 )}
@@ -271,14 +346,14 @@ const SignupPage = () => {
                   placeholder="000000"
                   maxLength={6}
                   required
-                  disabled={loading}
+                  disabled={loading || rateLimited}
                 />
               </div>
 
               <button
                 type="submit"
                 className="btn-primary w-full"
-                disabled={loading}
+                disabled={loading || rateLimited}
               >
                 {loading ? (
                   <span className="flex items-center justify-center gap-2">
@@ -300,37 +375,46 @@ const SignupPage = () => {
                     </svg>
                     Verifying...
                   </span>
+                ) : rateLimited ? (
+                  `Wait ${formatTime(rateLimitSeconds)}`
                 ) : (
                   "Verify OTP & Complete Signup"
                 )}
               </button>
 
-              {/* Actions */}
               <div className="flex items-center justify-between text-sm">
                 <button
                   type="button"
                   onClick={() => {
                     setStep(1);
                     setOtp("");
+                    setRateLimited(false);
                   }}
                   className="text-primary-600 hover:text-primary-700 font-medium"
                   disabled={loading}
                 >
-                  Change Details
+                  ← Change Details
                 </button>
+
+                {/* Resend with cooldown */}
                 <button
                   type="button"
                   onClick={handleResendOTP}
-                  className="text-primary-600 hover:text-primary-700 font-medium"
-                  disabled={loading}
+                  disabled={loading || resendCooldown > 0 || rateLimited}
+                  className={`font-medium transition-colors ${
+                    resendCooldown > 0 || rateLimited
+                      ? "text-gray-400 cursor-not-allowed"
+                      : "text-primary-600 hover:text-primary-700"
+                  }`}
                 >
-                  Resend OTP
+                  {resendCooldown > 0
+                    ? `Resend in ${resendCooldown}s`
+                    : "Resend OTP"}
                 </button>
               </div>
             </form>
           )}
 
-          {/* Development Note */}
           {process.env.NODE_ENV === "development" && step === 2 && (
             <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
               <p className="text-xs text-yellow-800">
