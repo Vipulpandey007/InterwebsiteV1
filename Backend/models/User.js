@@ -41,9 +41,15 @@ const userSchema = new mongoose.Schema(
     },
     otp: {
       type: String,
+      default: null,
     },
     otpExpires: {
       type: Date,
+      default: null,
+    },
+    otpSentAt: {
+      type: Date,
+      default: null,
     },
     lastLogin: {
       type: Date,
@@ -82,7 +88,8 @@ userSchema.methods.comparePassword = async function (candidatePassword) {
 userSchema.methods.generateOTP = function () {
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
   this.otp = otp;
-  this.otpExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
+  this.otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+  this.otpSentAt = new Date();
   return otp;
 };
 
@@ -101,8 +108,9 @@ userSchema.methods.verifyOTP = function (candidateOTP) {
 
 // Clear OTP
 userSchema.methods.clearOTP = function () {
-  this.otp = undefined;
-  this.otpExpires = undefined;
+  this.otp = null;
+  this.otpExpires = null;
+  this.otpSentAt = null;
 };
 
 // Update last login

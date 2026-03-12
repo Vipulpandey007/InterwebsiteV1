@@ -109,10 +109,20 @@ const verifySignupController = async (req, res) => {
       });
     }
 
+    // Distinguish expired OTP from wrong OTP for better UX
+    const now = new Date();
+    if (user.otp && user.otpExpires && now > user.otpExpires) {
+      return res.status(400).json({
+        success: false,
+        code: "OTP_EXPIRED",
+        message: "Your OTP has expired. Please request a new one.",
+      });
+    }
     if (!user.verifyOTP(otp)) {
       return res.status(400).json({
         success: false,
-        message: "Invalid or expired OTP",
+        code: "OTP_INVALID",
+        message: "Incorrect OTP. Please check and try again.",
       });
     }
 
@@ -235,10 +245,19 @@ const verifyLoginController = async (req, res) => {
       });
     }
 
+    const now = new Date();
+    if (user.otp && user.otpExpires && now > user.otpExpires) {
+      return res.status(400).json({
+        success: false,
+        code: "OTP_EXPIRED",
+        message: "Your OTP has expired. Please request a new one.",
+      });
+    }
     if (!user.verifyOTP(otp)) {
       return res.status(400).json({
         success: false,
-        message: "Invalid or expired OTP",
+        code: "OTP_INVALID",
+        message: "Incorrect OTP. Please check and try again.",
       });
     }
 
@@ -297,7 +316,30 @@ const resendOTPController = async (req, res) => {
       });
     }
 
+    // ── 30-second cooldown between resend requests ────────────────────────
+    const COOLDOWN_SECONDS = 30;
+    if (user.otpExpires) {
+      // otpExpires is set to (now + OTP_TTL) when OTP is generated.
+      // We store otpSentAt separately, OR we infer: if otp still exists and
+      // was generated less than COOLDOWN_SECONDS ago, block the resend.
+      // Use otpSentAt field if present, otherwise fall back to otpExpires math.
+      const sentAt = user.otpSentAt || null;
+      if (sentAt) {
+        const elapsed = (Date.now() - new Date(sentAt).getTime()) / 1000;
+        if (elapsed < COOLDOWN_SECONDS) {
+          const waitSeconds = Math.ceil(COOLDOWN_SECONDS - elapsed);
+          return res.status(429).json({
+            success: false,
+            code: "RESEND_COOLDOWN",
+            message: `Please wait ${waitSeconds} seconds before requesting a new OTP.`,
+            waitSeconds,
+          });
+        }
+      }
+    }
+
     const otp = user.generateOTP();
+    user.otpSentAt = new Date(); // track when OTP was last sent
     await user.save();
 
     try {
