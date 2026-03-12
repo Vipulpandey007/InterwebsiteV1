@@ -119,7 +119,7 @@ const getStats = async (req, res) => {
 };
 
 /**
- * @desc    Get all applications
+ * @desc    Get all applications (with pagination, search, and filtering)
  * @route   GET /api/admin/applications
  * @access  Private (Admin only)
  */
@@ -127,20 +127,59 @@ const getAllApplications = async (req, res) => {
   try {
     const Application = require("../models/Application");
 
-    const applications = await Application.find()
-      .populate("userId", "name email mobile")
-      .sort({ createdAt: -1 });
+    // 1. Get params from the frontend request URL
+    const { page = 1, limit = 20, status, search } = req.query;
 
+    // 2. Build the query object
+    const query = {};
+
+    // Apply Status Filter
+    if (status && status !== "all") {
+      query.status = status;
+    }
+
+    // Apply Search Filter (Regex for partial matching, "i" for case-insensitive)
+    if (search) {
+      query.$or = [
+        { fullName: { $regex: search, $options: "i" } },
+        { applicationNumber: { $regex: search, $options: "i" } },
+        { email: { $regex: search, $options: "i" } },
+        { contactNo: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    // 3. Pagination Math
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const skip = (pageNum - 1) * limitNum;
+
+    // 4. Execute Queries in parallel
+    const [total, applications] = await Promise.all([
+      Application.countDocuments(query), // Gets total matching documents
+      Application.find(query) // Gets the actual documents for this page
+        .populate("userId", "name email mobile")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limitNum),
+    ]);
+
+    const totalPages = Math.ceil(total / limitNum);
+
+    // 5. Return data exactly as frontend expects it
     res.status(200).json({
       success: true,
-      count: applications.length,
-      data: { applications },
+      total, // Frontend needs this
+      totalPages, // Frontend needs this
+      data: {
+        applications, // Frontend maps over this
+      },
     });
   } catch (error) {
     console.error("Get All Applications Error:", error);
-    res
-      .status(500)
-      .json({ success: false, message: "Failed to fetch applications" });
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch applications",
+    });
   }
 };
 
@@ -215,13 +254,11 @@ const updateApplicationStatus = async (req, res) => {
 
     console.log("✅ Status updated successfully");
 
-    res
-      .status(200)
-      .json({
-        success: true,
-        message: "Status updated successfully",
-        data: { application },
-      });
+    res.status(200).json({
+      success: true,
+      message: "Status updated successfully",
+      data: { application },
+    });
   } catch (error) {
     console.error("Update Status Error:", error);
     res
@@ -265,22 +302,18 @@ const updateApplication = async (req, res) => {
 
     console.log("✅ Application updated successfully");
 
-    res
-      .status(200)
-      .json({
-        success: true,
-        message: "Application updated successfully",
-        data: { application },
-      });
+    res.status(200).json({
+      success: true,
+      message: "Application updated successfully",
+      data: { application },
+    });
   } catch (error) {
     console.error("Update Application Error:", error);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Failed to update application",
-        error: error.message,
-      });
+    res.status(500).json({
+      success: false,
+      message: "Failed to update application",
+      error: error.message,
+    });
   }
 };
 
@@ -295,12 +328,10 @@ const createAdmin = async (req, res) => {
 
     const existingAdmin = await User.findOne({ email });
     if (existingAdmin) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "Admin with this email already exists",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "Admin with this email already exists",
+      });
     }
 
     const admin = await User.create({
@@ -326,13 +357,11 @@ const createAdmin = async (req, res) => {
       },
     });
   } catch (error) {
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Failed to create admin",
-        error: error.message,
-      });
+    res.status(500).json({
+      success: false,
+      message: "Failed to create admin",
+      error: error.message,
+    });
   }
 };
 

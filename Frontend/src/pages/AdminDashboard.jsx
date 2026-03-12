@@ -415,21 +415,30 @@ const AdminDashboard = () => {
 
   // ── Export helpers ──
   const buildExportRow = (app) => ({
+    // Core Info
     "Application No.": app.applicationNumber || "",
+    "Reference No.": app.referenceNumber || "",
     "Applied For": app.appliedFor || "",
     Session: app.session || "",
+
+    // Personal Details
     "Full Name": app.fullName || "",
     "Father's Name": app.fatherName || "",
     "Mother's Name": app.motherName || "",
     DOB: app.dateOfBirth
       ? new Date(app.dateOfBirth).toLocaleDateString("en-IN")
       : "",
+    Age: app.age || "",
     Gender: app.gender || "",
     Category: app.category || "",
     Religion: app.religion || "",
     "Mother Tongue": app.motherTongue || "",
     "Blood Group": app.bloodGroup || "",
     Nationality: app.nationality || "",
+    "Height (cm)": app.studentHeight || "",
+    "Weight (kg)": app.studentWeight || "",
+
+    // Contact & Address
     "Contact No": app.contactNo || "",
     "WhatsApp No": app.whatsappNo || "",
     "Guardian Contact": app.guardianContactNo || "",
@@ -438,6 +447,8 @@ const AdminDashboard = () => {
     "AAPAR ID": app.aaparId || "",
     "Present Address": app.presentAddress || "",
     "Permanent Address": app.permanentAddress || "",
+
+    // Education
     "School Name": app.schoolName || "",
     Board: app.board || "",
     Subject: app.subject || "",
@@ -447,12 +458,41 @@ const AdminDashboard = () => {
     Grade: app.grade || "",
     Division: app.division || "",
     "Year of Passing": app.yearOfPassing || "",
-    Status: app.status || "",
-    "Payment Status": app.paymentStatus || "",
-    Amount: app.amount || "",
+
+    // Document Upload Checks (Outputs Yes/No)
+    "Photo Uploaded": app.documents?.studentPhoto ? "Yes" : "No",
+    "10th Marksheet Uploaded": app.documents?.tenthMarksheet ? "Yes" : "No",
+    "10th Admit Card Uploaded": app.documents?.tenthAdmitCard ? "Yes" : "No",
+    "TC Uploaded": app.documents?.transferCertificate ? "Yes" : "No",
+    "Character Cert Uploaded": app.documents?.characterCertificate
+      ? "Yes"
+      : "No",
+    "Migration Uploaded": app.documents?.migration ? "Yes" : "No",
+    "Caste Cert Uploaded": app.documents?.casteCertificate ? "Yes" : "No",
+    "BPL Cert Uploaded": app.documents?.bplCertificate ? "Yes" : "No",
+    "Aadhar Doc Uploaded": app.documents?.aadharCardDoc ? "Yes" : "No",
+
+    // Workflow & Status
+    "Application Status": app.status ? app.status.toUpperCase() : "",
+    "Admit Card Generated": app.admitCardGenerated ? "Yes" : "No",
+    "Disclaimer Agreed": app.disclaimerAgreed ? "Yes" : "No",
+
+    // Payment Details
+    "Payment Status": app.paymentStatus ? app.paymentStatus.toUpperCase() : "",
+    "Amount Paid": app.amount || "",
     "Transaction ID": app.transactionId || "",
+    "Razorpay Order ID": app.razorpayOrderId || "",
+    "Razorpay Payment ID": app.razorpayPaymentId || "",
+    "Payment Date": app.paymentDate
+      ? new Date(app.paymentDate).toLocaleString("en-IN")
+      : "",
+
+    // Timestamps
     "Submitted At": app.createdAt
-      ? new Date(app.createdAt).toLocaleDateString("en-IN")
+      ? new Date(app.createdAt).toLocaleString("en-IN")
+      : "",
+    "Last Updated": app.updatedAt
+      ? new Date(app.updatedAt).toLocaleString("en-IN")
       : "",
   });
 
