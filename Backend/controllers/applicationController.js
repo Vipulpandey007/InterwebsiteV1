@@ -39,12 +39,15 @@ const createApplication = async (req, res) => {
 
     const existingApplication = await Application.findOne({
       userId: req.user.id,
+      session: settings.session, // lock is per-session, not lifetime
     });
 
     if (existingApplication) {
-      return res.status(400).json({
+      return res.status(409).json({
         success: false,
-        message: "You have already submitted an application",
+        code: "DUPLICATE_APPLICATION",
+        message: `You have already applied for the ${settings.session} session. Only one application per session is allowed.`,
+        data: { existingId: existingApplication._id },
       });
     }
 

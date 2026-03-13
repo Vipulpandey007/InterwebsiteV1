@@ -9,232 +9,13 @@ import {
 } from "../services/api";
 import toast from "react-hot-toast";
 
-// ─── Status config ────────────────────────────────────────────────────────────
-const STATUS_CONFIG = {
-  draft: { label: "Draft", color: "#6B7280", bg: "#F3F4F6", icon: "✏️" },
-  submitted: {
-    label: "Submitted",
-    color: "#2563EB",
-    bg: "#EFF6FF",
-    icon: "📤",
-  },
-  under_review: {
-    label: "Under Review",
-    color: "#D97706",
-    bg: "#FFFBEB",
-    icon: "🔍",
-  },
-  approved: { label: "Approved", color: "#059669", bg: "#ECFDF5", icon: "✅" },
-  rejected: { label: "Rejected", color: "#DC2626", bg: "#FEF2F2", icon: "❌" },
-};
+// Import modular components & configs
+import { STATUS_CONFIG, PAY_CONFIG } from "../constants/studentsConstatnts";
+import { StatusPill } from "../components/student/SharedUi";
+import OverviewTab from "../components/student/OverviewTab";
+import DetailsTab from "../components/student/DetailsTab";
+import DocumentsTab from "../components/student/DocumentsTab";
 
-const PAY_CONFIG = {
-  pending: { label: "Pending", color: "#D97706", bg: "#FFFBEB" },
-  completed: { label: "Paid", color: "#059669", bg: "#ECFDF5" },
-  failed: { label: "Failed", color: "#DC2626", bg: "#FEF2F2" },
-};
-
-// ─── Small reusable components ────────────────────────────────────────────────
-const InfoCard = ({ label, value, mono }) => (
-  <div
-    style={{
-      background: "#F8FAFC",
-      border: "1px solid #E2E8F0",
-      borderRadius: 10,
-      padding: "14px 16px",
-    }}
-  >
-    <p
-      style={{
-        fontSize: 11,
-        fontWeight: 600,
-        color: "#94A3B8",
-        textTransform: "uppercase",
-        letterSpacing: "0.06em",
-        marginBottom: 4,
-      }}
-    >
-      {label}
-    </p>
-    <p
-      style={{
-        fontSize: 15,
-        fontWeight: 700,
-        color: "#1E293B",
-        fontFamily: mono ? "monospace" : "inherit",
-        wordBreak: "break-all",
-      }}
-    >
-      {value || "—"}
-    </p>
-  </div>
-);
-
-const StatusPill = ({ status, config }) => {
-  const c = config[status] || config[Object.keys(config)[0]];
-  return (
-    <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 6,
-        background: c.bg,
-        color: c.color,
-        border: `1.5px solid ${c.color}33`,
-        borderRadius: 999,
-        padding: "4px 12px",
-        fontSize: 12,
-        fontWeight: 700,
-        letterSpacing: "0.04em",
-        textTransform: "uppercase",
-      }}
-    >
-      <span
-        style={{
-          width: 7,
-          height: 7,
-          borderRadius: "50%",
-          background: c.color,
-          flexShrink: 0,
-        }}
-      ></span>
-      {c.label}
-    </span>
-  );
-};
-
-const StepLine = ({ done }) => (
-  <div
-    style={{
-      width: 2,
-      height: 32,
-      background: done ? "#6366F1" : "#E2E8F0",
-      margin: "4px auto",
-    }}
-  />
-);
-
-// ─── Timeline Step ────────────────────────────────────────────────────────────
-const TimelineStep = ({ num, title, subtitle, status, children }) => {
-  const isDone = status === "done";
-  const isActive = status === "active";
-  const isLocked = status === "locked";
-
-  return (
-    <div style={{ display: "flex", gap: 16, opacity: isLocked ? 0.45 : 1 }}>
-      {/* Circle */}
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          flexShrink: 0,
-        }}
-      >
-        <div
-          style={{
-            width: 40,
-            height: 40,
-            borderRadius: "50%",
-            background: isDone ? "#6366F1" : isActive ? "#fff" : "#F1F5F9",
-            border: `2px solid ${isDone ? "#6366F1" : isActive ? "#6366F1" : "#E2E8F0"}`,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: isDone ? 16 : 14,
-            fontWeight: 700,
-            color: isDone ? "#fff" : isActive ? "#6366F1" : "#94A3B8",
-            boxShadow: isActive ? "0 0 0 4px #6366F120" : "none",
-            transition: "all 0.3s",
-          }}
-        >
-          {isDone ? "✓" : num}
-        </div>
-      </div>
-
-      {/* Content */}
-      <div style={{ flex: 1, paddingBottom: 28 }}>
-        <div style={{ marginBottom: children ? 16 : 0 }}>
-          <p
-            style={{
-              fontSize: 16,
-              fontWeight: 700,
-              color: "#1E293B",
-              marginBottom: 2,
-            }}
-          >
-            {title}
-          </p>
-          {subtitle && (
-            <p style={{ fontSize: 13, color: "#64748B" }}>{subtitle}</p>
-          )}
-        </div>
-        {children}
-      </div>
-    </div>
-  );
-};
-
-// ─── Document checklist ───────────────────────────────────────────────────────
-const DOCS = [
-  { key: "studentPhoto", label: "Passport Photo", required: true },
-  { key: "tenthMarksheet", label: "10th Marksheet", required: true },
-  { key: "tenthAdmitCard", label: "10th Admit Card", required: true },
-  { key: "transferCertificate", label: "Transfer Certificate", required: true },
-  {
-    key: "characterCertificate",
-    label: "Character Certificate",
-    required: true,
-  },
-  { key: "migration", label: "Migration Certificate", required: false },
-  { key: "casteCertificate", label: "Caste Certificate", required: false },
-  { key: "bplCertificate", label: "BPL Certificate", required: false },
-  { key: "aadharCardDoc", label: "Aadhar Card Copy", required: false },
-];
-
-const DocumentChecklist = ({ documents }) => (
-  <div
-    style={{
-      display: "grid",
-      gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
-      gap: 8,
-    }}
-  >
-    {DOCS.map(({ key, label, required }) => {
-      const uploaded = documents?.[key];
-      return (
-        <div
-          key={key}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "8px 12px",
-            borderRadius: 8,
-            background: uploaded ? "#F0FDF4" : required ? "#FFF7ED" : "#F8FAFC",
-            border: `1px solid ${uploaded ? "#BBF7D0" : required ? "#FED7AA" : "#E2E8F0"}`,
-          }}
-        >
-          <span style={{ fontSize: 14 }}>
-            {uploaded ? "✅" : required ? "⚠️" : "○"}
-          </span>
-          <span
-            style={{
-              fontSize: 12,
-              fontWeight: 500,
-              color: uploaded ? "#166534" : required ? "#92400E" : "#64748B",
-            }}
-          >
-            {label}
-            {required && !uploaded ? " *" : ""}
-          </span>
-        </div>
-      );
-    })}
-  </div>
-);
-
-// ─── Main Dashboard ───────────────────────────────────────────────────────────
 const Dashboard = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -250,7 +31,7 @@ const Dashboard = () => {
     settingsAPI
       .getSettings()
       .then((res) => setPortalSettings(res.data.data))
-      .catch(() => {}); // silent — dashboard still works if this fails
+      .catch(() => {});
   }, []);
 
   const fetchApplication = async () => {
@@ -266,94 +47,165 @@ const Dashboard = () => {
     }
   };
 
-  const handleSubmitApplication = async () => {
-    try {
-      const res = await applicationAPI.submit(application._id);
-      if (res.data.success) {
-        toast.success("Application submitted successfully!");
-        fetchApplication();
+  const handlers = {
+    handleSubmitApplication: async () => {
+      try {
+        const res = await applicationAPI.submit(application._id);
+        if (res.data.success) {
+          toast.success("Application submitted successfully!");
+          fetchApplication();
+        }
+      } catch (err) {
+        toast.error(
+          err.response?.data?.message || "Failed to submit application",
+        );
       }
-    } catch (err) {
-      toast.error(
-        err.response?.data?.message || "Failed to submit application",
-      );
-    }
-  };
-
-  const handlePayment = async () => {
-    if (!application) return;
-    setPaymentLoading(true);
-    try {
-      const orderRes = await paymentAPI.createOrder(application._id);
-      const orderData = orderRes.data.data;
-
-      const options = {
-        key: orderData.razorpayKeyId,
-        amount: orderData.amount * 100,
-        currency: orderData.currency,
-        name: "Gossner Intermediate College",
-        description: "Application Fee — Session 2026-27",
-        order_id: orderData.orderId,
-        prefill: {
-          name: orderData.name,
-          email: orderData.email,
-          contact: orderData.mobile,
-        },
-        theme: { color: "#6366F1" },
-        handler: async (response) => {
-          try {
-            const verRes = await paymentAPI.verifyPayment({
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature,
-              applicationId: application._id,
-            });
-            if (verRes.data.success) {
-              toast.success("🎉 Payment successful!");
-              fetchApplication();
-            }
-          } catch {
-            toast.error("Payment verification failed");
-          } finally {
-            setPaymentLoading(false);
-          }
-        },
-        modal: {
-          ondismiss: () => {
-            toast.error("Payment cancelled");
-            setPaymentLoading(false);
+    },
+    handlePayment: async () => {
+      if (!application) return;
+      setPaymentLoading(true);
+      try {
+        const orderRes = await paymentAPI.createOrder(application._id);
+        const orderData = orderRes.data.data;
+        const options = {
+          key: orderData.razorpayKeyId,
+          amount: orderData.amount * 100,
+          currency: orderData.currency,
+          name: "Gossner Intermediate College",
+          description: "Application Fee — Session 2026-27",
+          order_id: orderData.orderId,
+          prefill: {
+            name: orderData.name,
+            email: orderData.email,
+            contact: orderData.mobile,
           },
-        },
-      };
-
-      new window.Razorpay(options).open();
-    } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to initiate payment");
-      setPaymentLoading(false);
-    }
-  };
-
-  const handleGeneratePDF = async () => {
-    setPdfLoading(true);
-    try {
-      const res = await pdfAPI.generate(application._id);
-      if (res.data.success) {
-        toast.success("Application form generated!");
-        fetchApplication();
+          theme: { color: "#6366F1" },
+          handler: async (response) => {
+            try {
+              const verRes = await paymentAPI.verifyPayment({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+                applicationId: application._id,
+              });
+              if (verRes.data.success) {
+                toast.success("🎉 Payment successful!");
+                fetchApplication();
+              }
+            } catch {
+              toast.error("Payment verification failed");
+            } finally {
+              setPaymentLoading(false);
+            }
+          },
+          modal: {
+            ondismiss: () => {
+              toast.error("Payment cancelled");
+              setPaymentLoading(false);
+            },
+          },
+        };
+        new window.Razorpay(options).open();
+      } catch (err) {
+        toast.error(
+          err.response?.data?.message || "Failed to initiate payment",
+        );
+        setPaymentLoading(false);
       }
-    } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to generate PDF");
-    } finally {
-      setPdfLoading(false);
-    }
-  };
+    },
+    handleGeneratePDF: async () => {
+      setPdfLoading(true);
+      try {
+        const res = await pdfAPI.generate(application._id);
+        if (res.data.success) {
+          toast.success("Application form generated!");
+          fetchApplication();
+        }
+      } catch (err) {
+        toast.error(err.response?.data?.message || "Failed to generate PDF");
+      } finally {
+        setPdfLoading(false);
+      }
+    },
+    handleDownloadPDF: () =>
+      window.open(pdfAPI.downloadURL(application._id), "_blank"),
 
-  const handleDownloadPDF = () => {
-    window.open(pdfAPI.downloadURL(application._id), "_blank");
-  };
+    // Fully restored Receipt Generator logic
+    handleDownloadReceipt: () => {
+      const a = application;
+      const payDate = a.paymentDate
+        ? new Date(a.paymentDate).toLocaleDateString("en-IN", {
+            day: "2-digit",
+            month: "long",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+          })
+        : "—";
 
-  const handleDownloadSummary = () => {
-    window.open(pdfAPI.applicationSummaryURL(application._id), "_blank");
+      const html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Payment Receipt - ${a.applicationNumber}</title>
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { font-family: 'Segoe UI', Arial, sans-serif; background: #fff; color: #1E293B; }
+            .page { max-width: 600px; margin: 40px auto; padding: 40px; border: 1px solid #E2E8F0; border-radius: 12px; }
+            .header { text-align: center; border-bottom: 2px solid #6366F1; padding-bottom: 20px; margin-bottom: 28px; }
+            .header h1 { font-size: 22px; font-weight: 800; color: #6366F1; }
+            .header p { font-size: 13px; color: #64748B; margin-top: 4px; }
+            .badge { display: inline-block; background: #D1FAE5; color: #065F46; font-size: 13px; font-weight: 700; padding: 5px 16px; border-radius: 20px; margin-top: 10px; }
+            .amount-box { background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 10px; text-align: center; padding: 20px; margin-bottom: 24px; }
+            .amount-box .label { font-size: 12px; color: #6B7280; font-weight: 600; margin-bottom: 4px; }
+            .amount-box .value { font-size: 36px; font-weight: 900; color: #166534; }
+            .row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #F1F5F9; font-size: 13px; }
+            .row .key { color: #6B7280; font-weight: 600; }
+            .row .val { color: #1E293B; font-weight: 700; text-align: right; max-width: 60%; word-break: break-all; font-family: monospace; }
+            .footer { text-align: center; margin-top: 28px; font-size: 11px; color: #94A3B8; }
+            @media print {
+              body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+              .page { border: none; margin: 0; border-radius: 0; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="page">
+            <div class="header">
+              <h1>Gossner Intermediate College</h1>
+              <p>Ranchi, Jharkhand</p>
+              <div class="badge">✓ Payment Successful</div>
+            </div>
+
+            <div class="amount-box">
+              <div class="label">Amount Paid</div>
+              <div class="value">₹${a.amount || 1000}</div>
+            </div>
+
+            <div class="row"><span class="key">Receipt For</span><span class="val">${a.fullName || "—"}</span></div>
+            <div class="row"><span class="key">Application No.</span><span class="val">${a.applicationNumber || "—"}</span></div>
+            <div class="row"><span class="key">Session</span><span class="val">${a.session || "—"}</span></div>
+            <div class="row"><span class="key">Course Applied</span><span class="val">${a.appliedFor || "—"}</span></div>
+            <div class="row"><span class="key">Transaction ID</span><span class="val">${a.transactionId || "—"}</span></div>
+            <div class="row"><span class="key">Razorpay Order ID</span><span class="val">${a.razorpayOrderId || "—"}</span></div>
+            <div class="row"><span class="key">Payment Date</span><span class="val">${payDate}</span></div>
+            <div class="row"><span class="key">Payment Mode</span><span class="val">Online (Razorpay)</span></div>
+            <div class="row"><span class="key">Payment Status</span><span class="val" style="color:#166534">Completed</span></div>
+
+            <div class="footer">
+              <p>This is a computer-generated receipt. No signature required.</p>
+              <p style="margin-top:4px">Generated on ${new Date().toLocaleString("en-IN")}</p>
+            </div>
+          </div>
+          <script>window.onload = () => { window.print(); }</script>
+        </body>
+        </html>
+      `;
+
+      const w = window.open("", "_blank");
+      w.document.write(html);
+      w.document.close();
+    },
   };
 
   const handleLogout = () => {
@@ -362,35 +214,25 @@ const Dashboard = () => {
     toast.success("Logged out");
   };
 
-  // ── Derive step statuses ──
   const getStepStatus = (step) => {
     if (!application) return "locked";
     const { status, paymentStatus, admitCardGenerated } = application;
-
-    if (step === 1) {
-      if (status === "draft") return "active";
-      return "done";
-    }
+    if (step === 1) return status === "draft" ? "active" : "done";
     if (step === 2) {
       if (status === "draft") return "locked";
-      if (paymentStatus === "completed") return "done";
-      return "active";
+      return paymentStatus === "completed" ? "done" : "active";
     }
     if (step === 3) {
       if (paymentStatus !== "completed") return "locked";
-      if (status === "approved" || status === "rejected") return "done";
-      return "active";
+      return status === "approved" || status === "rejected" ? "done" : "active";
     }
     if (step === 4) {
-      // PDF available after payment — no admin approval required
       if (paymentStatus !== "completed") return "locked";
-      if (admitCardGenerated) return "done";
-      return "active";
+      return admitCardGenerated ? "done" : "active";
     }
     return "locked";
   };
 
-  // ─── Loading ───────────────────────────────────────────────────────────────
   if (loading)
     return (
       <div
@@ -414,7 +256,6 @@ const Dashboard = () => {
               margin: "0 auto 16px",
             }}
           />
-          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
           <p style={{ color: "#64748B", fontSize: 15, fontWeight: 500 }}>
             Loading your dashboard…
           </p>
@@ -422,11 +263,10 @@ const Dashboard = () => {
       </div>
     );
 
-  // ─── No Application ────────────────────────────────────────────────────────
   if (!application)
     return (
       <div style={{ minHeight: "100vh", background: "#F8FAFC" }}>
-        {/* Header */}
+        {/* Header for No Application State */}
         <header
           style={{
             background: "#fff",
@@ -475,7 +315,6 @@ const Dashboard = () => {
             Logout
           </button>
         </header>
-
         <div
           style={{
             maxWidth: 540,
@@ -485,7 +324,6 @@ const Dashboard = () => {
           }}
         >
           {portalSettings && !portalSettings.isAccepting ? (
-            /* ── Portal Closed — no application yet ── */
             <>
               <div style={{ fontSize: 64, marginBottom: 24 }}>🔒</div>
               <h2
@@ -498,48 +336,11 @@ const Dashboard = () => {
               >
                 Applications Closed
               </h2>
-              <p
-                style={{
-                  color: "#64748B",
-                  fontSize: 15,
-                  marginBottom: 16,
-                  lineHeight: 1.6,
-                }}
-              >
-                {portalSettings.closedMessage ||
-                  "The admission portal is currently closed. Please check back later."}
-              </p>
-              {portalSettings.closeDate && (
-                <div
-                  style={{
-                    display: "inline-block",
-                    background: "#FEF3C7",
-                    border: "1px solid #FDE68A",
-                    borderRadius: 10,
-                    padding: "10px 20px",
-                    fontSize: 13,
-                    color: "#92400E",
-                    fontWeight: 600,
-                    marginBottom: 24,
-                  }}
-                >
-                  📅 Deadline:{" "}
-                  {new Date(portalSettings.closeDate).toLocaleDateString(
-                    "en-IN",
-                    {
-                      day: "2-digit",
-                      month: "long",
-                      year: "numeric",
-                    },
-                  )}
-                </div>
-              )}
-              <p style={{ fontSize: 13, color: "#94A3B8" }}>
-                For enquiries, contact the college admission office.
+              <p style={{ color: "#64748B", fontSize: 15, marginBottom: 16 }}>
+                {portalSettings.closedMessage}
               </p>
             </>
           ) : (
-            /* ── Portal Open — start application ── */
             <>
               <div style={{ fontSize: 64, marginBottom: 24 }}>📋</div>
               <h2
@@ -552,17 +353,6 @@ const Dashboard = () => {
               >
                 No Application Yet
               </h2>
-              <p
-                style={{
-                  color: "#64748B",
-                  fontSize: 15,
-                  marginBottom: 32,
-                  lineHeight: 1.6,
-                }}
-              >
-                Begin your admission journey at Gossner Intermediate College.
-                Fill the application form to get started.
-              </p>
               <button
                 onClick={() => navigate("/apply")}
                 style={{
@@ -574,7 +364,6 @@ const Dashboard = () => {
                   fontSize: 15,
                   fontWeight: 700,
                   cursor: "pointer",
-                  boxShadow: "0 4px 14px #6366F140",
                 }}
               >
                 Start Application →
@@ -584,10 +373,6 @@ const Dashboard = () => {
         </div>
       </div>
     );
-
-  // ─── Main Dashboard ────────────────────────────────────────────────────────
-  const s = STATUS_CONFIG[application.status] || STATUS_CONFIG.draft;
-  const ps = PAY_CONFIG[application.paymentStatus] || PAY_CONFIG.pending;
 
   return (
     <div
@@ -640,22 +425,13 @@ const Dashboard = () => {
             >
               Student Portal
             </p>
-            <p style={{ fontSize: 11, color: "#94A3B8", marginTop: 2 }}>
-              Gossner Intermediate College
-            </p>
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <div
-            style={{
-              textAlign: "right",
-              display: window.innerWidth > 480 ? "block" : "none",
-            }}
-          >
+          <div style={{ textAlign: "right" }}>
             <p style={{ fontSize: 13, fontWeight: 700, color: "#1E293B" }}>
               {user?.name}
             </p>
-            <p style={{ fontSize: 11, color: "#94A3B8" }}>{user?.mobile}</p>
           </div>
           <button
             onClick={handleLogout}
@@ -675,7 +451,7 @@ const Dashboard = () => {
         </div>
       </header>
 
-      {/* ── Status Banner ── */}
+      {/* ── Status Banners ── */}
       {application.status === "rejected" && (
         <div
           style={{
@@ -686,8 +462,7 @@ const Dashboard = () => {
           }}
         >
           <p style={{ color: "#DC2626", fontWeight: 600, fontSize: 14 }}>
-            ❌ Your application has been rejected. Please contact the college
-            for more information.
+            ❌ Your application has been rejected.
           </p>
         </div>
       )}
@@ -701,61 +476,12 @@ const Dashboard = () => {
           }}
         >
           <p style={{ color: "#059669", fontWeight: 600, fontSize: 14 }}>
-            🎉 Congratulations! Your application has been approved. Please
-            download your application form below.
+            🎉 Congratulations! Your application has been approved.
           </p>
         </div>
       )}
 
       <div style={{ maxWidth: 1080, margin: "0 auto", padding: "32px 24px" }}>
-        {/* ── Portal Closed Notice (has application) ── */}
-        {portalSettings && !portalSettings.isAccepting && (
-          <div
-            style={{
-              background: "#FFFBEB",
-              border: "1px solid #FDE68A",
-              borderRadius: 12,
-              padding: "14px 20px",
-              marginBottom: 20,
-              display: "flex",
-              alignItems: "center",
-              gap: 12,
-            }}
-          >
-            <span style={{ fontSize: 20 }}>⚠️</span>
-            <div>
-              <p
-                style={{
-                  fontSize: 14,
-                  fontWeight: 700,
-                  color: "#92400E",
-                  margin: 0,
-                }}
-              >
-                Admission Portal is Closed
-              </p>
-              <p style={{ fontSize: 13, color: "#B45309", margin: "2px 0 0" }}>
-                {portalSettings.closedMessage ||
-                  "The portal is currently not accepting new applications."}{" "}
-                {portalSettings.closeDate && (
-                  <>
-                    Deadline was{" "}
-                    {new Date(portalSettings.closeDate).toLocaleDateString(
-                      "en-IN",
-                      {
-                        day: "2-digit",
-                        month: "long",
-                        year: "numeric",
-                      },
-                    )}
-                    .
-                  </>
-                )}
-              </p>
-            </div>
-          </div>
-        )}
-
         {/* ── Top summary strip ── */}
         <div
           style={{
@@ -770,40 +496,15 @@ const Dashboard = () => {
           }}
         >
           <div>
-            <p
-              style={{
-                fontSize: 11,
-                fontWeight: 600,
-                color: "#94A3B8",
-                textTransform: "uppercase",
-                letterSpacing: "0.06em",
-                marginBottom: 6,
-              }}
-            >
+            <p style={{ fontSize: 11, fontWeight: 600, color: "#94A3B8" }}>
               Application No.
             </p>
-            <p
-              style={{
-                fontSize: 16,
-                fontWeight: 800,
-                color: "#6366F1",
-                fontFamily: "monospace",
-              }}
-            >
+            <p style={{ fontSize: 16, fontWeight: 800, color: "#6366F1" }}>
               {application.applicationNumber || "—"}
             </p>
           </div>
           <div>
-            <p
-              style={{
-                fontSize: 11,
-                fontWeight: 600,
-                color: "#94A3B8",
-                textTransform: "uppercase",
-                letterSpacing: "0.06em",
-                marginBottom: 6,
-              }}
-            >
+            <p style={{ fontSize: 11, fontWeight: 600, color: "#94A3B8" }}>
               Student Name
             </p>
             <p style={{ fontSize: 15, fontWeight: 700, color: "#1E293B" }}>
@@ -811,48 +512,13 @@ const Dashboard = () => {
             </p>
           </div>
           <div>
-            <p
-              style={{
-                fontSize: 11,
-                fontWeight: 600,
-                color: "#94A3B8",
-                textTransform: "uppercase",
-                letterSpacing: "0.06em",
-                marginBottom: 6,
-              }}
-            >
-              Course Applied
-            </p>
-            <p style={{ fontSize: 15, fontWeight: 700, color: "#1E293B" }}>
-              {application.appliedFor || "—"}
-            </p>
-          </div>
-          <div>
-            <p
-              style={{
-                fontSize: 11,
-                fontWeight: 600,
-                color: "#94A3B8",
-                textTransform: "uppercase",
-                letterSpacing: "0.06em",
-                marginBottom: 6,
-              }}
-            >
+            <p style={{ fontSize: 11, fontWeight: 600, color: "#94A3B8" }}>
               Application Status
             </p>
             <StatusPill status={application.status} config={STATUS_CONFIG} />
           </div>
           <div>
-            <p
-              style={{
-                fontSize: 11,
-                fontWeight: 600,
-                color: "#94A3B8",
-                textTransform: "uppercase",
-                letterSpacing: "0.06em",
-                marginBottom: 6,
-              }}
-            >
+            <p style={{ fontSize: 11, fontWeight: 600, color: "#94A3B8" }}>
               Payment Status
             </p>
             <StatusPill
@@ -862,7 +528,7 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* ── Tabs ── */}
+        {/* ── Tabs Controls ── */}
         <div
           style={{
             display: "flex",
@@ -892,7 +558,6 @@ const Dashboard = () => {
                 fontSize: 13,
                 fontWeight: 600,
                 cursor: "pointer",
-                transition: "all 0.2s",
               }}
             >
               {tab.label}
@@ -900,770 +565,18 @@ const Dashboard = () => {
           ))}
         </div>
 
-        {/* ════════════════════════════════════════════════ */}
-        {/* TAB: OVERVIEW — Application progress timeline   */}
-        {/* ════════════════════════════════════════════════ */}
+        {/* ── Tab Content ── */}
         {activeTab === "overview" && (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 20 }}>
-            {/* Progress Timeline Card */}
-            <div
-              style={{
-                background: "#fff",
-                borderRadius: 14,
-                border: "1px solid #E2E8F0",
-                padding: "28px 28px 8px",
-              }}
-            >
-              <h3
-                style={{
-                  fontSize: 17,
-                  fontWeight: 800,
-                  color: "#1E293B",
-                  marginBottom: 24,
-                }}
-              >
-                Application Progress
-              </h3>
-
-              {/* STEP 1: Fill & Submit */}
-              <TimelineStep
-                num={1}
-                title="Fill & Submit Application"
-                subtitle={
-                  ["draft", "submitted"].includes(application.status) &&
-                  application.paymentStatus !== "completed"
-                    ? "Complete or edit your application form."
-                    : `Submitted on ${application.createdAt ? new Date(application.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"}`
-                }
-                status={getStepStatus(1)}
-              >
-                {application.paymentStatus !== "completed" &&
-                  application.status !== "approved" &&
-                  application.status !== "rejected" && (
-                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                      <button
-                        onClick={() =>
-                          navigate("/apply", {
-                            state: {
-                              applicationId: application._id,
-                              editMode: true,
-                            },
-                          })
-                        }
-                        style={{
-                          background: "#EEF2FF",
-                          color: "#6366F1",
-                          border: "none",
-                          padding: "9px 18px",
-                          borderRadius: 8,
-                          fontSize: 13,
-                          fontWeight: 700,
-                          cursor: "pointer",
-                        }}
-                      >
-                        ✏️ Edit Application
-                      </button>
-                      <button
-                        onClick={handleSubmitApplication}
-                        style={{
-                          background: "#6366F1",
-                          color: "#fff",
-                          border: "none",
-                          padding: "9px 18px",
-                          borderRadius: 8,
-                          fontSize: 13,
-                          fontWeight: 700,
-                          cursor: "pointer",
-                          boxShadow: "0 2px 8px #6366F140",
-                        }}
-                      >
-                        📤 Submit Application
-                      </button>
-                    </div>
-                  )}
-              </TimelineStep>
-
-              <StepLine done={getStepStatus(1) === "done"} />
-
-              {/* STEP 2: Payment */}
-              <TimelineStep
-                num={2}
-                title="Pay Application Fee"
-                subtitle={
-                  application.paymentStatus === "completed"
-                    ? `₹${application.amount} paid · Txn: ${application.transactionId || "—"}`
-                    : `₹${application.amount || 1000} due`
-                }
-                status={getStepStatus(2)}
-              >
-                {getStepStatus(2) === "active" && (
-                  <button
-                    onClick={handlePayment}
-                    disabled={paymentLoading}
-                    style={{
-                      background: paymentLoading ? "#A5B4FC" : "#6366F1",
-                      color: "#fff",
-                      border: "none",
-                      padding: "10px 22px",
-                      borderRadius: 8,
-                      fontSize: 14,
-                      fontWeight: 700,
-                      cursor: paymentLoading ? "not-allowed" : "pointer",
-                      boxShadow: "0 2px 8px #6366F140",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                    }}
-                  >
-                    {paymentLoading ? (
-                      <>
-                        <span
-                          style={{
-                            width: 16,
-                            height: 16,
-                            border: "2px solid #ffffff60",
-                            borderTop: "2px solid #fff",
-                            borderRadius: "50%",
-                            display: "inline-block",
-                            animation: "spin 0.7s linear infinite",
-                          }}
-                        />
-                        Processing…
-                      </>
-                    ) : (
-                      `💳 Pay ₹${application.amount || 1000}`
-                    )}
-                  </button>
-                )}
-
-                {/* Payment receipt */}
-                {application.paymentStatus === "completed" && (
-                  <div
-                    style={{
-                      background: "#F0FDF4",
-                      border: "1px solid #BBF7D0",
-                      borderRadius: 10,
-                      padding: "14px 16px",
-                      display: "grid",
-                      gridTemplateColumns:
-                        "repeat(auto-fit, minmax(140px, 1fr))",
-                      gap: 12,
-                    }}
-                  >
-                    <div>
-                      <p
-                        style={{
-                          fontSize: 11,
-                          color: "#6B7280",
-                          fontWeight: 600,
-                          marginBottom: 3,
-                        }}
-                      >
-                        Transaction ID
-                      </p>
-                      <p
-                        style={{
-                          fontSize: 12,
-                          fontFamily: "monospace",
-                          fontWeight: 700,
-                          color: "#166534",
-                          wordBreak: "break-all",
-                        }}
-                      >
-                        {application.transactionId || "—"}
-                      </p>
-                    </div>
-                    <div>
-                      <p
-                        style={{
-                          fontSize: 11,
-                          color: "#6B7280",
-                          fontWeight: 600,
-                          marginBottom: 3,
-                        }}
-                      >
-                        Amount Paid
-                      </p>
-                      <p
-                        style={{
-                          fontSize: 16,
-                          fontWeight: 800,
-                          color: "#166534",
-                        }}
-                      >
-                        ₹{application.amount}
-                      </p>
-                    </div>
-                    <div>
-                      <p
-                        style={{
-                          fontSize: 11,
-                          color: "#6B7280",
-                          fontWeight: 600,
-                          marginBottom: 3,
-                        }}
-                      >
-                        Payment Date
-                      </p>
-                      <p
-                        style={{
-                          fontSize: 13,
-                          fontWeight: 600,
-                          color: "#166534",
-                        }}
-                      >
-                        {application.paymentDate
-                          ? new Date(
-                              application.paymentDate,
-                            ).toLocaleDateString("en-IN", {
-                              day: "2-digit",
-                              month: "short",
-                              year: "numeric",
-                            })
-                          : "—"}
-                      </p>
-                    </div>
-                    <div>
-                      <p
-                        style={{
-                          fontSize: 11,
-                          color: "#6B7280",
-                          fontWeight: 600,
-                          marginBottom: 3,
-                        }}
-                      >
-                        Mode
-                      </p>
-                      <p
-                        style={{
-                          fontSize: 13,
-                          fontWeight: 600,
-                          color: "#166534",
-                        }}
-                      >
-                        Online (Razorpay)
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </TimelineStep>
-
-              <StepLine done={getStepStatus(2) === "done"} />
-
-              {/* STEP 3: Under Review */}
-              <TimelineStep
-                num={3}
-                title="Application Under Review"
-                subtitle={
-                  application.status === "approved"
-                    ? "Your application has been approved by the college."
-                    : application.status === "rejected"
-                      ? "Your application was not approved. Contact college for details."
-                      : application.paymentStatus === "completed"
-                        ? "Your application is being reviewed by the admissions team."
-                        : "This step will be unlocked after payment."
-                }
-                status={getStepStatus(3)}
-              >
-                {application.status === "rejected" && (
-                  <div
-                    style={{
-                      background: "#FEF2F2",
-                      border: "1px solid #FCA5A5",
-                      borderRadius: 8,
-                      padding: "12px 16px",
-                    }}
-                  >
-                    <p
-                      style={{
-                        color: "#DC2626",
-                        fontSize: 13,
-                        fontWeight: 600,
-                      }}
-                    >
-                      Contact the college at: admission@gcraninter.org or visit
-                      in person.
-                    </p>
-                  </div>
-                )}
-              </TimelineStep>
-
-              <StepLine done={getStepStatus(3) === "done"} />
-
-              {/* STEP 4: Download Admit Card */}
-              <TimelineStep
-                num={4}
-                title="Download Application Form"
-                subtitle={
-                  application.paymentStatus !== "completed"
-                    ? "Available after application approval."
-                    : application.admitCardGenerated
-                      ? "Your application form is ready to download."
-                      : "Click below to generate your application form."
-                }
-                status={getStepStatus(4)}
-              >
-                {application.paymentStatus === "completed" && (
-                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                    {application.admitCardGenerated ? (
-                      <>
-                        <button
-                          onClick={handleDownloadPDF}
-                          style={{
-                            background: "#6366F1",
-                            color: "#fff",
-                            border: "none",
-                            padding: "10px 20px",
-                            borderRadius: 8,
-                            fontSize: 13,
-                            fontWeight: 700,
-                            cursor: "pointer",
-                            boxShadow: "0 2px 8px #6366F140",
-                          }}
-                        >
-                          ⬇️ Download Application Form
-                        </button>
-                        <button
-                          onClick={handleGeneratePDF}
-                          disabled={pdfLoading}
-                          style={{
-                            background: "#F8FAFC",
-                            color: "#64748B",
-                            border: "1px solid #E2E8F0",
-                            padding: "10px 20px",
-                            borderRadius: 8,
-                            fontSize: 13,
-                            fontWeight: 600,
-                            cursor: "pointer",
-                          }}
-                        >
-                          {pdfLoading ? "Regenerating…" : "🔄 Regenerate"}
-                        </button>
-                      </>
-                    ) : (
-                      <button
-                        onClick={handleGeneratePDF}
-                        disabled={pdfLoading}
-                        style={{
-                          background: "#6366F1",
-                          color: "#fff",
-                          border: "none",
-                          padding: "10px 22px",
-                          borderRadius: 8,
-                          fontSize: 14,
-                          fontWeight: 700,
-                          cursor: pdfLoading ? "not-allowed" : "pointer",
-                          boxShadow: "0 2px 8px #6366F140",
-                          opacity: pdfLoading ? 0.7 : 1,
-                        }}
-                      >
-                        {pdfLoading
-                          ? "Generating…"
-                          : "📄 Generate Application Form"}
-                      </button>
-                    )}
-                  </div>
-                )}
-              </TimelineStep>
-            </div>
-
-            {/* Download Application Summary */}
-            {application.status !== "draft" && (
-              <div
-                style={{
-                  background: "#F0FDF4",
-                  borderRadius: 12,
-                  border: "1px solid #BBF7D0",
-                  padding: "16px 20px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  flexWrap: "wrap",
-                  gap: 12,
-                }}
-              >
-                <div>
-                  <p
-                    style={{
-                      fontWeight: 700,
-                      color: "#166534",
-                      fontSize: 14,
-                      marginBottom: 4,
-                    }}
-                  >
-                    📋 Application Form Summary
-                  </p>
-                  <p style={{ color: "#15803D", fontSize: 13 }}>
-                    Download a PDF copy of your complete application for your
-                    records.
-                  </p>
-                </div>
-                {/* <button
-                  onClick={handleDownloadSummary}
-                  style={{
-                    background: "#16A34A",
-                    color: "#fff",
-                    border: "none",
-                    padding: "10px 20px",
-                    borderRadius: 8,
-                    fontSize: 13,
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    whiteSpace: "nowrap",
-                    boxShadow: "0 2px 8px #16A34A30",
-                  }}
-                >
-                  ⬇️ Download Summary PDF
-                </button> */}
-              </div>
-            )}
-
-            {/* Help Card */}
-            <div
-              style={{
-                background: "#EEF2FF",
-                borderRadius: 12,
-                border: "1px solid #C7D2FE",
-                padding: "16px 20px",
-              }}
-            >
-              <p
-                style={{
-                  fontWeight: 700,
-                  color: "#3730A3",
-                  fontSize: 14,
-                  marginBottom: 6,
-                }}
-              >
-                📞 Need Help?
-              </p>
-              <p style={{ color: "#4338CA", fontSize: 13, lineHeight: 1.6 }}>
-                Contact the admissions office at{" "}
-                <strong>admission@gcraninter.org</strong> or call the college
-                during working hours (9AM–4PM, Mon–Sat).
-              </p>
-            </div>
-          </div>
+          <OverviewTab
+            application={application}
+            getStepStatus={getStepStatus}
+            handlers={handlers}
+            loadingStates={{ paymentLoading, pdfLoading }}
+          />
         )}
-
-        {/* ════════════════════════ */}
-        {/* TAB: MY DETAILS         */}
-        {/* ════════════════════════ */}
-        {activeTab === "details" && (
-          <div
-            style={{
-              background: "#fff",
-              borderRadius: 14,
-              border: "1px solid #E2E8F0",
-              padding: "28px",
-            }}
-          >
-            <h3
-              style={{
-                fontSize: 17,
-                fontWeight: 800,
-                color: "#1E293B",
-                marginBottom: 20,
-              }}
-            >
-              Application Details
-            </h3>
-
-            {/* Personal */}
-            <p
-              style={{
-                fontSize: 12,
-                fontWeight: 700,
-                color: "#94A3B8",
-                textTransform: "uppercase",
-                letterSpacing: "0.06em",
-                marginBottom: 12,
-              }}
-            >
-              Personal Information
-            </p>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
-                gap: 12,
-                marginBottom: 24,
-              }}
-            >
-              <InfoCard label="Full Name" value={application.fullName} />
-              <InfoCard label="Father's Name" value={application.fatherName} />
-              <InfoCard label="Mother's Name" value={application.motherName} />
-              <InfoCard
-                label="Date of Birth"
-                value={
-                  application.dateOfBirth
-                    ? new Date(application.dateOfBirth).toLocaleDateString(
-                        "en-IN",
-                      )
-                    : "—"
-                }
-              />
-              <InfoCard label="Gender" value={application.gender} />
-              <InfoCard label="Category" value={application.category} />
-              <InfoCard label="Religion" value={application.religion} />
-              <InfoCard label="Nationality" value={application.nationality} />
-              <InfoCard label="Blood Group" value={application.bloodGroup} />
-              <InfoCard
-                label="Mother Tongue"
-                value={application.motherTongue}
-              />
-              <InfoCard
-                label="Aadhar No."
-                value={application.aadharCard}
-                mono
-              />
-              <InfoCard label="AAPAR ID" value={application.aaparId} mono />
-            </div>
-
-            {/* Contact */}
-            <p
-              style={{
-                fontSize: 12,
-                fontWeight: 700,
-                color: "#94A3B8",
-                textTransform: "uppercase",
-                letterSpacing: "0.06em",
-                marginBottom: 12,
-              }}
-            >
-              Contact Information
-            </p>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
-                gap: 12,
-                marginBottom: 24,
-              }}
-            >
-              <InfoCard label="Contact No." value={application.contactNo} />
-              <InfoCard label="WhatsApp No." value={application.whatsappNo} />
-              <InfoCard
-                label="Guardian Contact"
-                value={application.guardianContactNo}
-              />
-              <InfoCard label="Email" value={application.email} />
-            </div>
-
-            {/* Address */}
-            <p
-              style={{
-                fontSize: 12,
-                fontWeight: 700,
-                color: "#94A3B8",
-                textTransform: "uppercase",
-                letterSpacing: "0.06em",
-                marginBottom: 12,
-              }}
-            >
-              Address
-            </p>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: 12,
-                marginBottom: 24,
-              }}
-            >
-              <InfoCard
-                label="Present Address"
-                value={application.presentAddress}
-              />
-              <InfoCard
-                label="Permanent Address"
-                value={application.permanentAddress}
-              />
-            </div>
-
-            {/* Academic */}
-            <p
-              style={{
-                fontSize: 12,
-                fontWeight: 700,
-                color: "#94A3B8",
-                textTransform: "uppercase",
-                letterSpacing: "0.06em",
-                marginBottom: 12,
-              }}
-            >
-              Academic Details
-            </p>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
-                gap: 12,
-              }}
-            >
-              <InfoCard label="School Name" value={application.schoolName} />
-              <InfoCard label="Board" value={application.board} />
-              <InfoCard label="Subject" value={application.subject} />
-              <InfoCard
-                label="Marks Obtained"
-                value={application.marksObtained}
-              />
-              <InfoCard label="Total Marks" value={application.totalMarks} />
-              <InfoCard
-                label="Percentage"
-                value={
-                  application.percentage ? `${application.percentage}%` : "—"
-                }
-              />
-              <InfoCard label="Grade" value={application.grade} />
-              <InfoCard label="Division" value={application.division} />
-              <InfoCard
-                label="Year of Passing"
-                value={application.yearOfPassing}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* ════════════════════════ */}
-        {/* TAB: DOCUMENTS          */}
-        {/* ════════════════════════ */}
+        {activeTab === "details" && <DetailsTab application={application} />}
         {activeTab === "documents" && (
-          <div
-            style={{
-              background: "#fff",
-              borderRadius: 14,
-              border: "1px solid #E2E8F0",
-              padding: "28px",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                marginBottom: 20,
-                flexWrap: "wrap",
-                gap: 12,
-              }}
-            >
-              <h3 style={{ fontSize: 17, fontWeight: 800, color: "#1E293B" }}>
-                Uploaded Documents
-              </h3>
-              {application.paymentStatus !== "completed" &&
-                application.status !== "approved" &&
-                application.status !== "rejected" && (
-                  <button
-                    onClick={() =>
-                      navigate("/apply", {
-                        state: {
-                          applicationId: application._id,
-                          editMode: true,
-                        },
-                      })
-                    }
-                    style={{
-                      background: "#EEF2FF",
-                      color: "#6366F1",
-                      border: "none",
-                      padding: "8px 16px",
-                      borderRadius: 8,
-                      fontSize: 13,
-                      fontWeight: 700,
-                      cursor: "pointer",
-                    }}
-                  >
-                    ✏️ Edit Documents
-                  </button>
-                )}
-            </div>
-
-            <DocumentChecklist documents={application.documents} />
-
-            <div
-              style={{
-                marginTop: 20,
-                padding: "12px 16px",
-                background: "#FFF7ED",
-                border: "1px solid #FED7AA",
-                borderRadius: 8,
-              }}
-            >
-              <p style={{ fontSize: 12, color: "#92400E", fontWeight: 500 }}>
-                ⚠️ <strong>Required documents (*)</strong> must be uploaded
-                before submitting. Optional documents should be uploaded if
-                applicable to your category.
-              </p>
-            </div>
-
-            {/* Individual doc links */}
-            <div style={{ marginTop: 20 }}>
-              <p
-                style={{
-                  fontSize: 12,
-                  fontWeight: 700,
-                  color: "#94A3B8",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.06em",
-                  marginBottom: 12,
-                }}
-              >
-                View Uploaded Files
-              </p>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                {DOCS.map(({ key, label }) => {
-                  const filename = application.documents?.[key];
-                  if (!filename) return null;
-                  return (
-                    <a
-                      key={key}
-                      href={`http://localhost:5000/uploads/documents/${filename}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 6,
-                        background: "#F0FDF4",
-                        color: "#166534",
-                        border: "1px solid #BBF7D0",
-                        borderRadius: 8,
-                        padding: "6px 12px",
-                        fontSize: 12,
-                        fontWeight: 600,
-                        textDecoration: "none",
-                      }}
-                    >
-                      📄 {label}
-                    </a>
-                  );
-                })}
-                {/* Photo */}
-                {application.documents?.studentPhoto && (
-                  <a
-                    href={`http://localhost:5000/uploads/photos/${application.documents.studentPhoto}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 6,
-                      background: "#EFF6FF",
-                      color: "#1D4ED8",
-                      border: "1px solid #BFDBFE",
-                      borderRadius: 8,
-                      padding: "6px 12px",
-                      fontSize: 12,
-                      fontWeight: 600,
-                      textDecoration: "none",
-                    }}
-                  >
-                    🖼️ Passport Photo
-                  </a>
-                )}
-              </div>
-            </div>
-          </div>
+          <DocumentsTab application={application} />
         )}
       </div>
     </div>
