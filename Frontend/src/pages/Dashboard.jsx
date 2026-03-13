@@ -1,7 +1,12 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { applicationAPI, paymentAPI, pdfAPI } from "../services/api";
+import {
+  applicationAPI,
+  paymentAPI,
+  pdfAPI,
+  settingsAPI,
+} from "../services/api";
 import toast from "react-hot-toast";
 
 // ─── Status config ────────────────────────────────────────────────────────────
@@ -238,9 +243,14 @@ const Dashboard = () => {
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
+  const [portalSettings, setPortalSettings] = useState(null);
 
   useEffect(() => {
     fetchApplication();
+    settingsAPI
+      .getSettings()
+      .then((res) => setPortalSettings(res.data.data))
+      .catch(() => {}); // silent — dashboard still works if this fails
   }, []);
 
   const fetchApplication = async () => {
@@ -474,44 +484,103 @@ const Dashboard = () => {
             textAlign: "center",
           }}
         >
-          <div style={{ fontSize: 64, marginBottom: 24 }}>📋</div>
-          <h2
-            style={{
-              fontSize: 26,
-              fontWeight: 800,
-              color: "#1E293B",
-              marginBottom: 12,
-            }}
-          >
-            No Application Yet
-          </h2>
-          <p
-            style={{
-              color: "#64748B",
-              fontSize: 15,
-              marginBottom: 32,
-              lineHeight: 1.6,
-            }}
-          >
-            Begin your admission journey at Gossner Intermediate College. Fill
-            the application form to get started.
-          </p>
-          <button
-            onClick={() => navigate("/apply")}
-            style={{
-              background: "#6366F1",
-              color: "#fff",
-              border: "none",
-              padding: "14px 32px",
-              borderRadius: 10,
-              fontSize: 15,
-              fontWeight: 700,
-              cursor: "pointer",
-              boxShadow: "0 4px 14px #6366F140",
-            }}
-          >
-            Start Application →
-          </button>
+          {portalSettings && !portalSettings.isAccepting ? (
+            /* ── Portal Closed — no application yet ── */
+            <>
+              <div style={{ fontSize: 64, marginBottom: 24 }}>🔒</div>
+              <h2
+                style={{
+                  fontSize: 26,
+                  fontWeight: 800,
+                  color: "#1E293B",
+                  marginBottom: 12,
+                }}
+              >
+                Applications Closed
+              </h2>
+              <p
+                style={{
+                  color: "#64748B",
+                  fontSize: 15,
+                  marginBottom: 16,
+                  lineHeight: 1.6,
+                }}
+              >
+                {portalSettings.closedMessage ||
+                  "The admission portal is currently closed. Please check back later."}
+              </p>
+              {portalSettings.closeDate && (
+                <div
+                  style={{
+                    display: "inline-block",
+                    background: "#FEF3C7",
+                    border: "1px solid #FDE68A",
+                    borderRadius: 10,
+                    padding: "10px 20px",
+                    fontSize: 13,
+                    color: "#92400E",
+                    fontWeight: 600,
+                    marginBottom: 24,
+                  }}
+                >
+                  📅 Deadline:{" "}
+                  {new Date(portalSettings.closeDate).toLocaleDateString(
+                    "en-IN",
+                    {
+                      day: "2-digit",
+                      month: "long",
+                      year: "numeric",
+                    },
+                  )}
+                </div>
+              )}
+              <p style={{ fontSize: 13, color: "#94A3B8" }}>
+                For enquiries, contact the college admission office.
+              </p>
+            </>
+          ) : (
+            /* ── Portal Open — start application ── */
+            <>
+              <div style={{ fontSize: 64, marginBottom: 24 }}>📋</div>
+              <h2
+                style={{
+                  fontSize: 26,
+                  fontWeight: 800,
+                  color: "#1E293B",
+                  marginBottom: 12,
+                }}
+              >
+                No Application Yet
+              </h2>
+              <p
+                style={{
+                  color: "#64748B",
+                  fontSize: 15,
+                  marginBottom: 32,
+                  lineHeight: 1.6,
+                }}
+              >
+                Begin your admission journey at Gossner Intermediate College.
+                Fill the application form to get started.
+              </p>
+              <button
+                onClick={() => navigate("/apply")}
+                style={{
+                  background: "#6366F1",
+                  color: "#fff",
+                  border: "none",
+                  padding: "14px 32px",
+                  borderRadius: 10,
+                  fontSize: 15,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  boxShadow: "0 4px 14px #6366F140",
+                }}
+              >
+                Start Application →
+              </button>
+            </>
+          )}
         </div>
       </div>
     );
@@ -639,6 +708,54 @@ const Dashboard = () => {
       )}
 
       <div style={{ maxWidth: 1080, margin: "0 auto", padding: "32px 24px" }}>
+        {/* ── Portal Closed Notice (has application) ── */}
+        {portalSettings && !portalSettings.isAccepting && (
+          <div
+            style={{
+              background: "#FFFBEB",
+              border: "1px solid #FDE68A",
+              borderRadius: 12,
+              padding: "14px 20px",
+              marginBottom: 20,
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+            }}
+          >
+            <span style={{ fontSize: 20 }}>⚠️</span>
+            <div>
+              <p
+                style={{
+                  fontSize: 14,
+                  fontWeight: 700,
+                  color: "#92400E",
+                  margin: 0,
+                }}
+              >
+                Admission Portal is Closed
+              </p>
+              <p style={{ fontSize: 13, color: "#B45309", margin: "2px 0 0" }}>
+                {portalSettings.closedMessage ||
+                  "The portal is currently not accepting new applications."}{" "}
+                {portalSettings.closeDate && (
+                  <>
+                    Deadline was{" "}
+                    {new Date(portalSettings.closeDate).toLocaleDateString(
+                      "en-IN",
+                      {
+                        day: "2-digit",
+                        month: "long",
+                        year: "numeric",
+                      },
+                    )}
+                    .
+                  </>
+                )}
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* ── Top summary strip ── */}
         <div
           style={{

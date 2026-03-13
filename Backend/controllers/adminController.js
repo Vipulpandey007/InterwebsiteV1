@@ -138,14 +138,11 @@ const getAllApplications = async (req, res) => {
       query.status = status;
     }
 
-    // Apply Search Filter (Regex for partial matching, "i" for case-insensitive)
+    // Apply Search Filter (Optimized MongoDB Text Search)
     if (search) {
-      query.$or = [
-        { fullName: { $regex: search, $options: "i" } },
-        { applicationNumber: { $regex: search, $options: "i" } },
-        { email: { $regex: search, $options: "i" } },
-        { contactNo: { $regex: search, $options: "i" } },
-      ];
+      // By default, $text search is case-insensitive
+      // Enclosing in quotes ensures it searches for the exact phrase/number typed
+      query.$text = { $search: search };
     }
 
     // 3. Pagination Math

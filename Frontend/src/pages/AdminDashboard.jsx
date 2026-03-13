@@ -889,7 +889,197 @@ const AdminDashboard = () => {
             )}
           </div>
 
-          <div className="overflow-x-auto">
+          {/* ── Mobile Card View (< 768px) ── */}
+          <div className="block md:hidden divide-y divide-gray-100">
+            {applications.length === 0 && !tableLoading ? (
+              <div className="px-6 py-16 text-center">
+                <svg
+                  className="w-12 h-12 text-gray-300 mx-auto mb-3"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+                <p className="text-gray-400 font-medium">
+                  No applications found
+                </p>
+                {(debouncedSearch || statusFilter !== "all") && (
+                  <p className="text-gray-400 text-sm mt-1">
+                    Try clearing your search or filter
+                  </p>
+                )}
+              </div>
+            ) : (
+              applications.map((app, idx) => (
+                <div
+                  key={app._id}
+                  className="px-4 py-4 hover:bg-indigo-50/20 transition-colors"
+                >
+                  {/* Row 1: serial + app number + badges */}
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-400 w-5">
+                        {(page - 1) * limit + idx + 1}.
+                      </span>
+                      <span className="text-xs font-mono font-semibold text-indigo-600">
+                        {app.applicationNumber || "—"}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                      <PayBadge status={app.paymentStatus} />
+                      <StatusBadge status={app.status} />
+                    </div>
+                  </div>
+
+                  {/* Row 2: name + meta */}
+                  <div className="mb-2">
+                    <p className="text-sm font-semibold text-gray-900">
+                      {app.fullName || "—"}
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      {app.appliedFor} · {app.category} · {app.gender}
+                    </p>
+                  </div>
+
+                  {/* Row 3: contact */}
+                  <div className="mb-3">
+                    <p className="text-xs text-gray-600">
+                      {app.contactNo || "—"}
+                    </p>
+                    <p className="text-xs text-gray-400 truncate">
+                      {app.email || ""}
+                    </p>
+                  </div>
+
+                  {/* Row 4: date + actions */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-gray-400">
+                      {app.createdAt
+                        ? new Date(app.createdAt).toLocaleDateString("en-IN")
+                        : "—"}
+                    </span>
+                    <div className="flex items-center gap-1">
+                      {/* View */}
+                      <button
+                        onClick={() => handleView(app._id)}
+                        className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors"
+                        title="View details"
+                      >
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                          />
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                          />
+                        </svg>
+                      </button>
+                      {/* Edit */}
+                      <button
+                        onClick={async () => {
+                          try {
+                            const res = await adminAPI.getApplicationById(
+                              app._id,
+                            );
+                            if (res.data.success)
+                              setEditApp(res.data.data.application);
+                          } catch {
+                            toast.error("Failed to load application");
+                          }
+                        }}
+                        className="p-1.5 text-amber-600 hover:bg-amber-50 rounded-md transition-colors"
+                        title="Edit application"
+                      >
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                          />
+                        </svg>
+                      </button>
+                      {/* Approve */}
+                      {(app.status === "submitted" ||
+                        app.status === "under_review") && (
+                        <button
+                          onClick={() =>
+                            handleStatusChange(app._id, "approved")
+                          }
+                          className="p-1.5 text-green-600 hover:bg-green-50 rounded-md transition-colors"
+                          title="Approve"
+                        >
+                          <svg
+                            className="w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M5 13l4 4L19 7"
+                            />
+                          </svg>
+                        </button>
+                      )}
+                      {/* Reject */}
+                      {(app.status === "submitted" ||
+                        app.status === "under_review") && (
+                        <button
+                          onClick={() =>
+                            handleStatusChange(app._id, "rejected")
+                          }
+                          className="p-1.5 text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                          title="Reject"
+                        >
+                          <svg
+                            className="w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M6 18L18 6M6 6l12 12"
+                            />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* ── Desktop Table View (≥ 768px) ── */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="min-w-full">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100">
@@ -1115,6 +1305,7 @@ const AdminDashboard = () => {
               </tbody>
             </table>
           </div>
+          {/* end desktop table */}
 
           {/* ── Pagination ── */}
           {totalPages > 1 || total > 10 ? (

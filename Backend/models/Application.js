@@ -302,6 +302,25 @@ applicationSchema.index({ paymentStatus: 1 });
 // Compound index: status + createdAt — used in admin filtered+sorted list
 applicationSchema.index({ status: 1, createdAt: -1 });
 
+// Optimized Text Index for the Admin Dashboard Search Bar
+applicationSchema.index(
+  {
+    fullName: "text",
+    applicationNumber: "text",
+    email: "text",
+    contactNo: "text",
+  },
+  {
+    name: "admin_search_text_index",
+    weights: {
+      applicationNumber: 10, // Give highest priority to exact app number matches
+      contactNo: 5,
+      email: 5,
+      fullName: 1,
+    },
+  },
+);
+
 module.exports =
   mongoose.models.Application ||
   mongoose.model("Application", applicationSchema);
