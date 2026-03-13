@@ -257,6 +257,8 @@ const AdminDashboard = () => {
 
   // Export
   const [exporting, setExporting] = useState(false);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [bulkLoading, setBulkLoading] = useState(false);
 
   // Debounce search
   const debounceTimer = useRef(null);
@@ -379,6 +381,53 @@ const AdminDashboard = () => {
       fetchApplications();
     } catch {
       toast.error("Failed to update status");
+    }
+  };
+
+  // ── Bulk Selection ──
+  const eligibleIds = applications
+    .filter((a) => a.status === "submitted" || a.status === "under_review")
+    .map((a) => a._id);
+
+  const allEligibleSelected =
+    eligibleIds.length > 0 &&
+    eligibleIds.every((id) => selectedIds.includes(id));
+
+  const toggleSelectAll = () => {
+    if (allEligibleSelected) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(eligibleIds);
+    }
+  };
+
+  const toggleSelect = (id) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
+    );
+  };
+
+  const handleBulkStatus = async (newStatus) => {
+    if (selectedIds.length === 0) return;
+    const label = newStatus === "approved" ? "Approve" : "Reject";
+    if (
+      !window.confirm(`${label} ${selectedIds.length} selected application(s)?`)
+    )
+      return;
+    setBulkLoading(true);
+    try {
+      await Promise.all(
+        selectedIds.map((id) =>
+          adminAPI.updateApplicationStatus(id, newStatus),
+        ),
+      );
+      toast.success(`${selectedIds.length} application(s) ${newStatus}`);
+      setSelectedIds([]);
+      fetchApplications();
+    } catch {
+      toast.error("Bulk action failed for some applications");
+    } finally {
+      setBulkLoading(false);
     }
   };
 
@@ -889,6 +938,64 @@ const AdminDashboard = () => {
             )}
           </div>
 
+          {/* ── Bulk Action Bar ── */}
+          {selectedIds.length > 0 && (
+            <div className="px-6 py-3 bg-indigo-50 border-b border-indigo-100 flex items-center justify-between flex-wrap gap-3">
+              <span className="text-sm font-medium text-indigo-700">
+                {selectedIds.length} application
+                {selectedIds.length > 1 ? "s" : ""} selected
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleBulkStatus("approved")}
+                  disabled={bulkLoading}
+                  className="flex items-center gap-1.5 px-4 py-1.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg transition"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M5 13l4 4L19 7"
+                    />
+                  </svg>
+                  Approve Selected
+                </button>
+                <button
+                  onClick={() => handleBulkStatus("rejected")}
+                  disabled={bulkLoading}
+                  className="flex items-center gap-1.5 px-4 py-1.5 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg transition"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                  Reject Selected
+                </button>
+                <button
+                  onClick={() => setSelectedIds([])}
+                  className="px-3 py-1.5 text-sm text-indigo-600 hover:bg-indigo-100 rounded-lg transition"
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* ── Mobile Card View (< 768px) ── */}
           <div className="block md:hidden divide-y divide-gray-100">
             {applications.length === 0 && !tableLoading ? (
@@ -924,6 +1031,20 @@ const AdminDashboard = () => {
                   {/* Row 1: serial + app number + badges */}
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <div className="flex items-center gap-2">
+                      {(app.status === "submitted" ||
+                        app.status === "under_review") && (
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(app._id)}
+                          onChange={() => toggleSelect(app._id)}
+                          style={{
+                            width: 16,
+                            height: 16,
+                            cursor: "pointer",
+                            accentColor: "#6366F1",
+                          }}
+                        />
+                      )}
                       <span className="text-xs text-gray-400 w-5">
                         {(page - 1) * limit + idx + 1}.
                       </span>
@@ -1071,6 +1192,30 @@ const AdminDashboard = () => {
                           </svg>
                         </button>
                       )}
+                      {/* Re-approve (rejected → approved) */}
+                      {app.status === "rejected" && (
+                        <button
+                          onClick={() =>
+                            handleStatusChange(app._id, "approved")
+                          }
+                          className="p-1.5 text-green-600 hover:bg-green-50 rounded-md transition-colors"
+                          title="Re-approve"
+                        >
+                          <svg
+                            className="w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                            />
+                          </svg>
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1083,6 +1228,22 @@ const AdminDashboard = () => {
             <table className="min-w-full">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100">
+                  <th className="px-4 py-3 w-10">
+                    <input
+                      type="checkbox"
+                      checked={allEligibleSelected}
+                      onChange={toggleSelectAll}
+                      disabled={eligibleIds.length === 0}
+                      title="Select all eligible"
+                      style={{
+                        width: 16,
+                        height: 16,
+                        cursor: "pointer",
+                        accentColor: "#6366F1",
+                        opacity: eligibleIds.length === 0 ? 0.4 : 1,
+                      }}
+                    />
+                  </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                     #
                   </th>
@@ -1117,7 +1278,7 @@ const AdminDashboard = () => {
               >
                 {applications.length === 0 && !tableLoading ? (
                   <tr>
-                    <td colSpan={9} className="px-6 py-16 text-center">
+                    <td colSpan={10} className="px-6 py-16 text-center">
                       <svg
                         className="w-12 h-12 text-gray-300 mx-auto mb-3"
                         fill="none"
@@ -1145,8 +1306,26 @@ const AdminDashboard = () => {
                   applications.map((app, idx) => (
                     <tr
                       key={app._id}
-                      className="hover:bg-indigo-50/30 transition-colors"
+                      className={`transition-colors ${selectedIds.includes(app._id) ? "bg-indigo-50" : "hover:bg-indigo-50/30"}`}
                     >
+                      <td className="px-4 py-3 w-10">
+                        {app.status === "submitted" ||
+                        app.status === "under_review" ? (
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.includes(app._id)}
+                            onChange={() => toggleSelect(app._id)}
+                            style={{
+                              width: 16,
+                              height: 16,
+                              cursor: "pointer",
+                              accentColor: "#6366F1",
+                            }}
+                          />
+                        ) : (
+                          <span className="w-4 h-4 block" />
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-sm text-gray-400">
                         {(page - 1) * limit + idx + 1}
                       </td>
@@ -1293,6 +1472,30 @@ const AdminDashboard = () => {
                                   strokeLinejoin="round"
                                   strokeWidth={2}
                                   d="M6 18L18 6M6 6l12 12"
+                                />
+                              </svg>
+                            </button>
+                          )}
+                          {/* Re-approve (rejected → approved) */}
+                          {app.status === "rejected" && (
+                            <button
+                              onClick={() =>
+                                handleStatusChange(app._id, "approved")
+                              }
+                              className="p-1.5 text-green-600 hover:bg-green-50 rounded-md transition-colors"
+                              title="Re-approve"
+                            >
+                              <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
                                 />
                               </svg>
                             </button>
