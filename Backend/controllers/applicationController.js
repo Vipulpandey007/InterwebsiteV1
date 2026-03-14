@@ -52,7 +52,7 @@ const createApplication = async (req, res) => {
     }
 
     // Generate unique application number
-    const applicationNumber = `APP${Date.now()}${Math.floor(Math.random() * 1000)}`;
+    const applicationNumber = `GIC${Date.now()}${Math.floor(Math.random() * 1000)}`;
 
     // Prepare documents object from uploaded files
     const documents = {};

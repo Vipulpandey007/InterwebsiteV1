@@ -1,71 +1,329 @@
-Project: Gossner Intermediate College Admission Portal (MERN Stack)
-Ranchi, Jharkhand. Session 2026-27. Status: 95% complete and fully functional.
-Tech Stack
+# Gossner Intermediate College — Admission Portal
+## Project Summary (as of 2026-03-14)
 
-Backend: Node.js/Express on port 5000, MongoDB/Mongoose, JWT, bcryptjs (rounds: 10), Razorpay, PDFKit, Multer
-Frontend: React 18, React Router, Axios, React Hot Toast, SheetJS (xlsx)
-Process Manager: PM2 cluster mode (ecosystem.config.js in Backend/)
-Admin credentials: admin@gcraninter.org / admin123
+---
 
-Folder layout
+## Tech Stack
+- **Backend:** Node.js/Express (port 5000), MongoDB/Mongoose, JWT, bcryptjs (rounds: 10), Razorpay, PDFKit, Multer
+- **Frontend:** React 18, React Router, Axios, React Hot Toast, SheetJS (xlsx)
+- **Process Manager:** PM2 cluster mode (`ecosystem.config.js` in `Backend/`)
+- **Admin credentials:** admin@gcraninter.org / admin123
 
-D:\Intermediatewebsite\Backend\ — Node/Express server
-D:\Intermediatewebsite\Frontend\ — React app
+---
 
-Backend key files
+## File Structure
 
-models/User.js — user schema, role: user/admin, bcrypt rounds 10
-models/Application.js — 41-field schema, 5 indexes (status, createdAt, userId, paymentStatus, compound status+createdAt). Do NOT add index on applicationNumber — it already has unique:true
-controllers/applicationController.js — stores uploaded files as .filename only, NOT .path (critical bug already fixed)
-controllers/adminController.js — has all 6 exports: adminLogin, getStats, getAllApplications, getApplicationById, updateApplication, updateApplicationStatus, createAdmin
-controllers/paymentController.js — Razorpay order + verify
-controllers/pdfController.js — PDFKit admit card with student photo
-middleware/authMiddleware.js — protect (JWT) + adminOnly (role check)
-config/db.js — maxPoolSize: 20, minPoolSize: 5
-config/multerConfig.js — uploads/photos/ and uploads/documents/
-ecosystem.config.js — PM2 cluster config (instances: max)
-server.js — must have: app.use('/uploads', express.static(path.join(__dirname, 'uploads'))) already added
+```
+Backend/
+  models/
+    User.js                         OTP auth, comparePassword, generateOTP, otpSentAt field
+    Application.js                  41 fields, activityLog subdoc, 6 indexes + text index
+    AdmissionSettings.js            Singleton model, isAccepting virtual
+  controllers/
+    authController.js               OTP verify (expired vs invalid), resend cooldown 30s
+    applicationController.js        createApplication (session-scoped dup check), CRUD
+    adminController.js              All admin ops + changePassword + getActivityLog
+    paymentController.js            Razorpay create-order, verify, webhook
+    applicationSummaryController.js PDFKit A4 summary PDF (6 sections, watermark)
+    pdfController.js                Admit card PDF generation
+  routes/
+    auth.js                         /api/auth/*
+    application.js                  /api/applications/*
+    admin.js                        /api/admin/*
+    payment.js                      /api/payment/*
+    pdf.js                          /api/pdf/*
+  middleware/
+    authMiddleware.js               protect (header + query token), adminOnly
+    rateLimiter.js                  6 limiters
+  config/
+    db.js                           maxPoolSize:20, minPoolSize:5
+    multerConfig.js                 photos/ vs documents/, 5MB limit
+  uploads/
+    photos/                         Student passport photos
+    documents/                      8 PDF documents per student
+  ecosystem.config.js               PM2 cluster config
+  createAdmin.js                    One-time admin seed script
 
-Frontend key files
+Frontend/src/
+  pages/
+    SignupPage.jsx                  OTP signup, 30s resend cooldown
+    LoginPage.jsx                   OTP login, 30s resend cooldown
+    Dashboard.jsx                   Student dashboard (3 tabs, timeline, receipt download, portal awareness)
+    ApplicationForm.jsx             6-step form + portal-closed guard
+    AdminLogin.jsx                  Email/password login (NO forgot password yet)
+    AdminDashboard.jsx              Stats, filter, search, bulk actions, settings, change password
+    NotFoundPage.jsx                404 catch-all
+  components/admin/
+    ApplicationDetailModal.jsx      Full detail view + Activity Log tab
+    ApplicationEditModal.jsx        Edit form modal (5 section components)
+    dashboard/
+      SettingsModal.jsx             Portal open/close settings
+      ChangePasswordModal.jsx       Admin password change (strength bar, show/hide)
+      ApplicationTable.jsx          Table component
+      SharedUI.jsx                  StatCard, badges
+  components/admin/shared/
+    FormField.jsx                   Reusable input
+    SectionWrapper.jsx              Section container
+  components/admin/editSections/
+    ApplicationInfoSection.jsx
+    PersonalDetailsSection.jsx
+    ContactDetailsSection.jsx
+    AddressSection.jsx
+    AcademicSection.jsx
+  components/review/
+    ReviewField.jsx, ReviewSection.jsx
+    ReviewBasicInfo.jsx, ReviewPersonalDetails.jsx
+    ReviewAddressDetails.jsx, ReviewAcademicDetails.jsx, ReviewDocuments.jsx
+  services/
+    api.js                          All API calls, interceptors, adminToken + userToken
+  context/
+    AuthContext.jsx                 User auth state
+  constants/
+    adminConstants.js               STATUS_META
+```
 
-src/pages/AdminDashboard.jsx — stats cards, filter/search, view modal, edit modal, Excel export (Export Filtered + Export All)
-src/pages/ApplicationForm.jsx — 6-step form, step 6 is full review of all 41 fields
-src/components/admin/ApplicationDetailModal.jsx — full view of all 41 fields + documents, has Edit button in footer
-src/components/admin/ApplicationEditModal.jsx — edit modal orchestrating 5 section components, has unsaved changes badge
-src/components/admin/shared/FormField.jsx — reusable input (text/select/textarea/date/number)
-src/components/admin/shared/SectionWrapper.jsx — reusable section wrapper
-src/components/admin/editSections/ — ApplicationInfoSection, PersonalDetailsSection, ContactDetailsSection, AddressSection, AcademicSection
-src/components/review/ — ReviewField, ReviewSection, ReviewBasicInfo, ReviewPersonalDetails, ReviewAddressDetails, ReviewAcademicDetails, ReviewDocuments
-src/services/api.js — axios with two interceptors: one for user token, one for adminToken
+---
 
-Application model — 41 fields
-appliedFor, session, referenceNumber, fullName, fatherName, motherName, dateOfBirth, gender, category, religion, motherTongue, bloodGroup, studentHeight, studentWeight, nationality, aaparId, contactNo, whatsappNo, guardianContactNo, email, aadharCard, presentAddress, permanentAddress, schoolName, board, subject, marksObtained, totalMarks, percentage, grade, yearOfPassing, division, documents (studentPhoto, tenthMarksheet, tenthAdmitCard, transferCertificate, characterCertificate, migration, casteCertificate, bplCertificate, aadharCardDoc), status, paymentStatus, amount, transactionId, razorpayOrderId, razorpayPaymentId, admitCardGenerated, disclaimerAgreed
-Admin API routes
+## All API Routes
 
-POST /api/admin/login
-GET /api/admin/stats
-GET /api/admin/applications?page=1&limit=50&status=all
-GET /api/admin/applications/:id
-PUT /api/admin/applications/:id — edit fields (updateApplication)
-PUT /api/admin/applications/:id/status — change status only
+### Auth — /api/auth
+| Method | Route | Description |
+|--------|-------|-------------|
+| POST | /signup | Send OTP to mobile |
+| POST | /verify-signup | Verify OTP, create user |
+| POST | /login | Send OTP to mobile |
+| POST | /verify-login | Verify OTP, return JWT |
+| POST | /resend-otp | Resend with 30s cooldown |
 
-Bugs already fixed (do not redo)
+### Applications — /api/applications
+| Method | Route | Description |
+|--------|-------|-------------|
+| POST | / | Create application (files) |
+| GET | /my-applications | Get student's applications |
+| GET | /:id | Get by ID |
+| PUT | /:id | Update application |
+| POST | /:id/submit | Submit application |
+| DELETE | /:id | Delete application |
 
-View button — now opens ApplicationDetailModal (not navigate)
-Document URLs — stored as filename only, served via /uploads/ static route
-Student photo not loading — express.static added in server.js
-updateApplication missing — now exists in adminController + exports
-Duplicate index warning — applicationNumber index removed from patch
-Route.put() undefined error — was caused by missing updateApplication export
-API interceptor — adminToken correctly sent for all admin routes
+### Admin — /api/admin
+| Method | Route | Description |
+|--------|-------|-------------|
+| POST | /login | Admin login |
+| POST | /create | Create admin (seed) |
+| GET | /stats | Dashboard stats |
+| GET | /applications | All apps (paginated, search, filter) |
+| GET | /applications/:id/activity | Activity log ⚠️ MUST be before /:id |
+| GET | /applications/:id | Get by ID |
+| PUT | /applications/:id | Update full application |
+| PUT | /applications/:id/status | Update status |
+| GET | /settings | Portal settings (public) |
+| PUT | /settings | Update settings (admin) |
+| PUT | /change-password | Change admin password |
 
-Load test results (Artillery)
+### Payment — /api/payment
+| Method | Route | Description |
+|--------|-------|-------------|
+| POST | /create-order | Create Razorpay order |
+| POST | /verify | Verify payment |
+| GET | /status/:applicationId | Payment status |
+| POST | /webhook | Razorpay webhook |
 
-Stress test (150 users/sec): 66% failure — expected, machine limitation
-Realistic test (3–15 users/sec): 100% pass, 0 timeouts, p95 = 821ms
-Server is production-ready for actual college admission traffic
+### PDF — /api/pdf
+| Method | Route | Description |
+|--------|-------|-------------|
+| POST | /generate/:id | Generate admit card |
+| GET | /status/:id | PDF status |
+| GET | /download/:id | Download admit card (token via query string) |
+| GET | /application-summary/:id | Application summary PDF (token via query string) |
 
-Remaining tasks
+---
 
-Frontend pagination UI for admin applications list (backend already supports ?page=&limit=)
-.env file needs: JWT_SECRET, MONGO_URI, RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, JWT_EXPIRE
+## Key Implementation Details
+
+### authMiddleware.js
+- Reads token from `Authorization: Bearer` header AND `?token=` query string
+- Query token fallback needed for `window.open()` PDF downloads (can't set headers)
+```js
+if (!token && req.query.token) token = req.query.token;
+```
+
+### Application.js — activityLog schema
+```js
+activityLog: [{
+  action: enum["status_changed","fields_edited","created","submitted","payment_completed"],
+  by: String,       // admin email
+  fromValue: String,
+  toValue: String,
+  note: String,
+  at: Date,
+}]
+```
+
+### Application.js — indexes
+```js
+{ status: 1 }
+{ createdAt: -1 }
+{ userId: 1 }
+{ applicationNumber: 1 }       // for exact lookups in PDF — keep alongside text index
+{ paymentStatus: 1 }
+{ status: 1, createdAt: -1 }   // compound
+// Text index:
+{ fullName: "text", applicationNumber: "text", email: "text", contactNo: "text" }
+// weights: applicationNumber:10, contactNo:5, email:5, fullName:1
+// $text search: query.$text = { $search: search }  — NO forced phrase quotes
+```
+
+### AdmissionSettings.js
+- Singleton: `AdmissionSettings.getSettings()` always returns/creates one doc
+- `isAccepting` virtual: `isOpen && now >= openDate && now <= closeDate`
+
+### applicationController.js — session-scoped duplicate check
+```js
+// settings already fetched above for portal-open check — no extra DB call
+Application.findOne({ userId: req.user.id, session: settings.session })
+// Returns 409 DUPLICATE_APPLICATION with session name in message
+```
+
+### adminController.js — changePassword
+- Finds admin with `User.findById(req.user.id).select("+password")`
+- Verifies current password with `admin.comparePassword(currentPassword)`
+- Sets `admin.password = newPassword` — hashed automatically by `pre-save` hook in User.js
+- Returns 401 if current password is wrong, 400 if same as new password
+
+### admin.js — CRITICAL route ordering
+```js
+// ✅ CORRECT — specific routes before parameterised
+router.get("/applications/:id/activity", protect, adminOnly, getActivityLog);
+router.get("/applications/:id", protect, adminOnly, getApplicationById);
+// ❌ WRONG — if /:id comes first, Express treats "activity" as the :id value
+```
+
+### api.js — PDF URLs must be ABSOLUTE
+```js
+// ✅ Correct — hits Express on port 5000
+const base = import.meta.env.VITE_API_URL || "http://localhost:5000";
+return `${base}/api/pdf/application-summary/${id}?token=${token}`;
+// ❌ Wrong — resolves to Vite dev server on port 5173
+return `/api/pdf/application-summary/${id}?token=${token}`;
+```
+
+### api.js — key adminAPI methods
+```js
+getAllApplications(params), getApplicationById(id), getActivityLog(id),
+updateApplicationStatus(id, status), updateApplication(id, data),
+createAdmin(data), adminLogin(data),
+getSettings(), updateSettings(data),
+changePassword(data)   // PUT /admin/change-password
+```
+
+### api.js — settingsAPI
+```js
+getSettings: () => api.get("/admin/settings"),   // public — no auth needed
+updateSettings: (data) => api.put("/admin/settings", data),
+```
+
+### AdminDashboard.jsx — bulk selection
+- `eligibleIds` = only `submitted` / `under_review` apps can be checked
+- Checkboxes use inline style `{ accentColor: "#6366F1" }` — NOT Tailwind classes
+  (Tailwind checkbox styling requires `@tailwindcss/forms` plugin which is NOT installed)
+- Bulk action bar appears when `selectedIds.length > 0`
+- Re-approve button (green circle-check) shown on `rejected` rows only
+
+---
+
+## Application Model — Key Fields (41 total)
+```
+appliedFor, session, referenceNumber
+fullName, fatherName, motherName, dateOfBirth, gender, category, religion
+contactNo, whatsappNo, guardianContactNo, email, aadharCard
+bloodGroup, motherTongue, studentHeight, studentWeight, nationality, aaparId
+presentAddress, permanentAddress
+schoolName, board, subject, marksObtained, totalMarks, percentage, grade, yearOfPassing, division
+documents: {
+  studentPhoto, tenthMarksheet, tenthAdmitCard, transferCertificate,
+  characterCertificate, migration, casteCertificate, bplCertificate, aadharCardDoc
+}
+status: enum["draft","submitted","under_review","approved","rejected"]
+paymentStatus: enum["pending","completed","failed"]
+amount, transactionId, razorpayOrderId, razorpayPaymentId, razorpaySignature, paymentDate
+admitCardGenerated, disclaimerAgreed
+activityLog: [{ action, by, fromValue, toValue, note, at }]
+```
+
+---
+
+## Features Completed ✅
+
+1. OTP-based user auth (signup/login), JWT 30d
+2. Admin panel email/password login
+3. 6-step application form (41 fields) with full review step (Step 6)
+4. File uploads: 1 photo + 8 PDF documents (Multer, 5MB)
+5. Razorpay payment (Rs.1000, order + verify)
+6. PDF admit card generation with student photo (PDFKit) — unlocks after payment
+7. Admin dashboard: stats, filter, search, approve/reject
+8. Admin: View full application in modal (41 fields, all docs linked)
+9. Admin: Edit application fields (5 modular section components)
+10. Admin: Export to Excel — "Export Filtered" + "Export All", SheetJS, 50+ cols
+11. Review step (Step 6) — 7 modular components showing all 41 fields
+12. MongoDB indexes (6 single + 1 compound + 1 text index)
+13. PM2 cluster mode
+14. Server-side pagination in AdminDashboard
+15. Student Dashboard — 3 tabs, 4-step progress timeline, payment receipt + download
+16. Rate limiting — 6 limiters
+17. Session-scoped duplicate application check (one app per user per session)
+18. Edit application — prefill + update+submit flow
+19. Admission deadline enforcement — frontend guard + backend 403 PORTAL_CLOSED
+20. OTP expiry + resend cooldown — OTP_EXPIRED vs OTP_INVALID, 30s countdown timer
+21. Application summary PDF — PDFKit, A4, 6 sections, DRAFT watermark
+22. Admin activity log — status_changed + fields_edited, timeline UI in detail modal
+23. 404 page — catch-all route, home button adapts to auth state
+24. Mobile responsive admin table — card view < 768px, table ≥ 768px
+25. MongoDB text index search — replaces regex, weighted fields, no forced quotes
+26. Dashboard deadline awareness — portal closed state shown to students
+27. Bulk approve/reject — checkboxes, select-all, bulk action bar
+28. Re-approve rejected applications — green circle-check on rejected rows
+29. Session-based application lock — one application per user per session
+30. Payment receipt download — browser-generated HTML receipt, auto print dialog
+31. Admin password change from UI — ChangePasswordModal with strength bar
+
+---
+
+## Pending Features ❌
+
+1. **Email notifications** — Nodemailer/Resend: on submit, payment, status change. Trigger points: `applicationController.js` (submit), `paymentController.js` (verify), `adminController.js` (updateApplicationStatus)
+2. **Forgot password for admin login** — `AdminLogin.jsx` has no "Forgot Password" link. No reset token flow exists. Currently the only recovery is deleting the admin user via MongoDB shell and re-running `createAdmin.js`
+3. **Forgot mobile / account recovery for students** — no flow if a student loses phone access. OTP is sent to mobile only, no email fallback
+4. **Admin activity log for settings changes** — portal settings updates (open/close, deadline) are not currently logged anywhere
+
+---
+
+## Critical Rules (do not break)
+
+| Rule | Detail |
+|------|--------|
+| Documents stored as `.filename` only | NOT `.path` — served via `/uploads/` static route in server.js |
+| server.js must have static middleware | `app.use('/uploads', express.static(path.join(__dirname, 'uploads')))` |
+| Do NOT add extra index on `applicationNumber` | Already has `unique:true` + covered by text index |
+| No custom `keyGenerator` in rate limiters | Causes `ERR_ERL_KEY_GEN_IPV6` in express-rate-limit v7+ |
+| Never mix `documents` + `documents.fieldName` in same `$set` | MongoDB throws conflict error |
+| Activity route MUST come before `/:id` in admin.js | Express matches "activity" as :id param otherwise |
+| PDF download URLs must be absolute | Relative URLs resolve to Vite port 5173, not Express port 5000 |
+| Checkbox styling: use inline style only | `{ accentColor: "#6366F1" }` — Tailwind needs `@tailwindcss/forms` plugin |
+| $text search: no forced quotes | `{ $search: search }` not `{ $search: \`\"${search}\"\` }` |
+
+---
+
+## How to Start
+```bash
+# Backend (dev)
+cd Backend && node server.js
+
+# Backend (prod)
+cd Backend && pm2 start ecosystem.config.js
+
+# Frontend
+cd Frontend && npm run dev
+
+# Create Admin
+cd Backend && node createAdmin.js
+```
