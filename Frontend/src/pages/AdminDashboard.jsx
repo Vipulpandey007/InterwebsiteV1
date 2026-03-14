@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { adminAPI, settingsAPI } from "../services/api";
+import { adminAPI, settingsAPI, admissionFeeAPI } from "../services/api";
 import toast from "react-hot-toast";
 import * as XLSX from "xlsx";
 
@@ -13,6 +13,9 @@ import ApplicationTable from "../components/admin/dashboard/ApplicationTable";
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
+
+  // Active tab: "applications" | "fee"
+  const [activeTab, setActiveTab] = useState("applications");
 
   // State
   const [stats, setStats] = useState({
@@ -55,6 +58,21 @@ const AdminDashboard = () => {
   });
   const [savingSettings, setSavingSettings] = useState(false);
 
+  // ── Fee Management state ──────────────────────────────────────────────────
+  const [feeStats, setFeeStats] = useState(null);
+  const [feeList, setFeeList] = useState([]);
+  const [feeLoading, setFeeLoading] = useState(false);
+  const [feeTotal, setFeeTotal] = useState(0);
+  const [feeTotalPages, setFeeTotalPages] = useState(1);
+  const [feePage, setFeePage] = useState(1);
+  const [feeStatusFilter, setFeeStatusFilter] = useState("all");
+  const [feeCourseFilter, setFeeCourseFilter] = useState("all");
+  const [feeSearch, setFeeSearch] = useState("");
+  const [feeDebouncedSearch, setFeeDebouncedSearch] = useState("");
+  const [markingOffline, setMarkingOffline] = useState(null); // applicationId being marked
+  const [offlineNote, setOfflineNote] = useState("");
+  const [feeExporting, setFeeExporting] = useState(false);
+
   const debounceTimer = useRef(null);
   const handleSearchChange = (value) => {
     setSearchTerm(value);
@@ -77,9 +95,100 @@ const AdminDashboard = () => {
         closeDate: s.closeDate ? s.closeDate.slice(0, 16) : "",
         closedMessage:
           s.closedMessage || "Applications for this session are now closed.",
+        admissionFees: s.admissionFees || [],
       });
     } catch {
       /* silent */
+    }
+  };
+
+  const fetchFeeStats = async () => {
+    try {
+      const res = await admissionFeeAPI.getFeeStats();
+      if (res.data.success) setFeeStats(res.data.data);
+    } catch {
+      /* silent */
+    }
+  };
+
+  const fetchFeeList = useCallback(async () => {
+    setFeeLoading(true);
+    try {
+      const res = await admissionFeeAPI.getFeeList({
+        page: feePage,
+        limit: 20,
+        feeStatus: feeStatusFilter,
+        course: feeCourseFilter,
+        search: feeDebouncedSearch,
+      });
+      if (res.data.success) {
+        setFeeList(res.data.data.applications);
+        setFeeTotal(res.data.total);
+        setFeeTotalPages(res.data.totalPages);
+      }
+    } catch {
+      toast.error("Failed to load fee list");
+    } finally {
+      setFeeLoading(false);
+    }
+  }, [feePage, feeStatusFilter, feeCourseFilter, feeDebouncedSearch]);
+
+  const handleMarkOffline = async (appId) => {
+    setMarkingOffline(appId);
+  };
+
+  const confirmMarkOffline = async (appId) => {
+    try {
+      await admissionFeeAPI.markOfflinePaid(appId, offlineNote);
+      toast.success("Marked as paid (offline)");
+      setMarkingOffline(null);
+      setOfflineNote("");
+      fetchFeeList();
+      fetchFeeStats();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to mark as paid");
+    }
+  };
+
+  const exportFeeExcel = async () => {
+    setFeeExporting(true);
+    try {
+      const res = await admissionFeeAPI.getFeeList({
+        page: 1,
+        limit: 9999,
+        feeStatus: feeStatusFilter,
+        course: feeCourseFilter,
+        search: feeDebouncedSearch,
+      });
+      const rows = res.data.data.applications.map((a) => ({
+        "Application No.": a.applicationNumber || "",
+        "Full Name": a.fullName || "",
+        Course: a.appliedFor || "",
+        Category: a.category || "",
+        "Fee Amount (₹)": a.admissionFeeAmount || 0,
+        "Fee Status": a.admissionFeeStatus
+          ? a.admissionFeeStatus.toUpperCase()
+          : "",
+        "Payment Date": a.admissionFeeDate
+          ? new Date(a.admissionFeeDate).toLocaleString("en-IN")
+          : "",
+        "Transaction ID": a.admissionTransactionId || "",
+        "Offline Payment": a.markedPaidOffline ? "Yes" : "No",
+        "Marked By": a.markedPaidBy || "",
+        Note: a.markedPaidNote || "",
+      }));
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Admission Fees");
+      XLSX.writeFile(
+        wb,
+        `GIC_AdmissionFees_${new Date().toISOString().split("T")[0]}.xlsx`,
+      );
+      toast.success(`Exported ${rows.length} records`);
+    } catch {
+      toast.error("Export failed");
+    } finally {
+      setFeeExporting(false);
     }
   };
 
@@ -112,7 +221,12 @@ const AdminDashboard = () => {
       .catch(() => {})
       .finally(() => setLoading(false));
     fetchSettings();
+    fetchFeeStats();
   }, []);
+
+  useEffect(() => {
+    if (activeTab === "fee") fetchFeeList();
+  }, [fetchFeeList, activeTab]);
 
   const fetchApplications = useCallback(async () => {
     setTableLoading(true);
@@ -417,75 +531,469 @@ const AdminDashboard = () => {
           />
         </div>
 
-        {/* Toolbar */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex flex-col lg:flex-row gap-4 justify-between lg:items-center">
-          <div className="flex flex-wrap gap-2">
-            {Object.entries(STATUS_META).map(([key, meta]) => (
-              <button
-                key={key}
-                onClick={() => {
-                  setStatusFilter(key);
-                  setPage(1);
-                }}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium ${statusFilter === key ? "bg-indigo-600 text-white shadow-sm" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
-              >
-                {meta.label}
-              </button>
-            ))}
-          </div>
-          <div className="flex items-center gap-3">
-            <input
-              type="text"
-              placeholder="Search applications..."
-              value={searchTerm}
-              onChange={(e) => handleSearchChange(e.target.value)}
-              className="w-full lg:w-64 px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-            />
+        {/* Tab Navigation */}
+        <div
+          style={{
+            display: "flex",
+            gap: 4,
+            background: "#fff",
+            borderRadius: 10,
+            border: "1px solid #E5E7EB",
+            padding: 4,
+            width: "fit-content",
+          }}
+        >
+          {[
+            { id: "applications", label: "📋 Applications" },
+            { id: "fee", label: "💳 Fee Management" },
+          ].map((tab) => (
             <button
-              onClick={() => doExport("filtered")}
-              disabled={exporting}
-              className="px-3 py-2 text-sm font-medium bg-green-600 hover:bg-green-700 text-white rounded-lg"
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-5 py-2 rounded-lg text-sm font-semibold transition-colors ${activeTab === tab.id ? "bg-indigo-600 text-white shadow-sm" : "text-gray-500 hover:bg-gray-100"}`}
             >
-              Export Filtered
+              {tab.label}
             </button>
-            <button
-              onClick={() => doExport("all")}
-              disabled={exporting}
-              className="px-3 py-2 text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg"
-            >
-              Export All
-            </button>
-          </div>
+          ))}
         </div>
 
-        {/* Application Table */}
-        <ApplicationTable
-          applications={applications}
-          tableLoading={tableLoading}
-          filterProps={{ debouncedSearch, statusFilter }}
-          paginationProps={{
-            page,
-            limit,
-            total,
-            totalPages,
-            setPage,
-            setLimit,
-          }}
-          selectionProps={{
-            selectedIds,
-            toggleSelect,
-            toggleSelectAll,
-            allEligibleSelected,
-            eligibleIds,
-          }}
-          actionProps={{
-            handleView,
-            handleEditClick,
-            handleStatusChange,
-            handleBulkStatus,
-            bulkLoading,
-          }}
-        />
+        {/* ── Applications Tab ─────────────────────────────────────────────── */}
+        {activeTab === "applications" && (
+          <>
+            {/* Toolbar */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex flex-col lg:flex-row gap-4 justify-between lg:items-center">
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(STATUS_META).map(([key, meta]) => (
+                  <button
+                    key={key}
+                    onClick={() => {
+                      setStatusFilter(key);
+                      setPage(1);
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium ${statusFilter === key ? "bg-indigo-600 text-white shadow-sm" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+                  >
+                    {meta.label}
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center gap-3">
+                <input
+                  type="text"
+                  placeholder="Search applications..."
+                  value={searchTerm}
+                  onChange={(e) => handleSearchChange(e.target.value)}
+                  className="w-full lg:w-64 px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                />
+                <button
+                  onClick={() => doExport("filtered")}
+                  disabled={exporting}
+                  className="px-3 py-2 text-sm font-medium bg-green-600 hover:bg-green-700 text-white rounded-lg"
+                >
+                  Export Filtered
+                </button>
+                <button
+                  onClick={() => doExport("all")}
+                  disabled={exporting}
+                  className="px-3 py-2 text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg"
+                >
+                  Export All
+                </button>
+              </div>
+            </div>
+
+            {/* Application Table */}
+            <ApplicationTable
+              applications={applications}
+              tableLoading={tableLoading}
+              filterProps={{ debouncedSearch, statusFilter }}
+              paginationProps={{
+                page,
+                limit,
+                total,
+                totalPages,
+                setPage,
+                setLimit,
+              }}
+              selectionProps={{
+                selectedIds,
+                toggleSelect,
+                toggleSelectAll,
+                allEligibleSelected,
+                eligibleIds,
+              }}
+              actionProps={{
+                handleView,
+                handleEditClick,
+                handleStatusChange,
+                handleBulkStatus,
+                bulkLoading,
+              }}
+            />
+          </>
+        )}
+
+        {/* ── Fee Management Tab ────────────────────────────────────────────── */}
+        {activeTab === "fee" && (
+          <div className="space-y-6">
+            {/* Stat cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              {[
+                {
+                  label: "Total Approved",
+                  value: feeStats?.totalApproved ?? "—",
+                  color: "bg-blue-50",
+                  icon: "📋",
+                },
+                {
+                  label: "Fee Paid",
+                  value: feeStats?.totalPaid ?? "—",
+                  color: "bg-green-50",
+                  icon: "✅",
+                },
+                {
+                  label: "Fee Pending",
+                  value: feeStats?.totalPending ?? "—",
+                  color: "bg-yellow-50",
+                  icon: "⏳",
+                },
+                {
+                  label: "Total Collected",
+                  value: `₹${(feeStats?.totalCollection || 0).toLocaleString("en-IN")}`,
+                  color: "bg-purple-50",
+                  icon: "💰",
+                },
+              ].map((c) => (
+                <StatCard
+                  key={c.label}
+                  label={c.label}
+                  value={c.value}
+                  color={c.color}
+                  icon={<span className="text-xl">{c.icon}</span>}
+                />
+              ))}
+            </div>
+
+            {/* Course breakdown */}
+            {feeStats?.courseBreakdown?.length > 0 && (
+              <div className="bg-white rounded-xl border border-gray-100 p-4">
+                <p className="text-sm font-semibold text-gray-500 mb-3">
+                  Collection by course
+                </p>
+                <div className="flex gap-4 flex-wrap">
+                  {feeStats.courseBreakdown.map((row) => (
+                    <div
+                      key={row._id}
+                      className="bg-indigo-50 rounded-lg px-4 py-3 text-center min-w-[120px]"
+                    >
+                      <p className="text-xs text-indigo-500 font-semibold mb-1">
+                        {row._id}
+                      </p>
+                      <p className="text-lg font-bold text-indigo-700">
+                        {row.count} students
+                      </p>
+                      <p className="text-xs text-indigo-600">
+                        ₹{(row.amount || 0).toLocaleString("en-IN")}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Filters + Export toolbar */}
+            <div className="bg-white rounded-xl border border-gray-100 p-4 flex flex-col lg:flex-row gap-4 justify-between lg:items-center">
+              <div className="flex gap-2 flex-wrap">
+                {/* Fee status filters */}
+                {[
+                  { key: "all", label: "All" },
+                  { key: "pending", label: "Pending" },
+                  { key: "completed", label: "Online Paid" },
+                  { key: "offline", label: "Offline Paid" },
+                ].map(({ key, label }) => (
+                  <button
+                    key={key}
+                    onClick={() => {
+                      setFeeStatusFilter(key);
+                      setFeePage(1);
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium ${feeStatusFilter === key ? "bg-indigo-600 text-white shadow-sm" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+                <span className="w-px bg-gray-200 self-stretch mx-1" />
+                {/* Course filters */}
+                {["all", "Science", "Commerce", "Arts"].map((c) => (
+                  <button
+                    key={c}
+                    onClick={() => {
+                      setFeeCourseFilter(c);
+                      setFeePage(1);
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium ${feeCourseFilter === c ? "bg-teal-600 text-white shadow-sm" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+                  >
+                    {c === "all" ? "All Courses" : c}
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  placeholder="Search by name / app no..."
+                  value={feeSearch}
+                  onChange={(e) => {
+                    setFeeSearch(e.target.value);
+                    clearTimeout(debounceTimer.current);
+                    debounceTimer.current = setTimeout(() => {
+                      setFeeDebouncedSearch(e.target.value);
+                      setFeePage(1);
+                    }, 400);
+                  }}
+                  className="w-52 px-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                />
+                <button
+                  onClick={exportFeeExcel}
+                  disabled={feeExporting}
+                  className="px-3 py-2 text-sm font-medium bg-green-600 hover:bg-green-700 text-white rounded-lg"
+                >
+                  {feeExporting ? "Exporting…" : "Export Excel"}
+                </button>
+              </div>
+            </div>
+
+            {/* Fee table */}
+            <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+              {feeLoading ? (
+                <div className="flex justify-center py-16">
+                  <div className="animate-spin rounded-full h-10 w-10 border-4 border-indigo-200 border-t-indigo-600" />
+                </div>
+              ) : feeList.length === 0 ? (
+                <div className="text-center py-16 text-gray-400 text-sm">
+                  No approved applications found for the selected filters.
+                </div>
+              ) : (
+                <>
+                  {/* Desktop table */}
+                  <div className="hidden md:block overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50 border-b border-gray-100">
+                        <tr>
+                          {[
+                            "App No.",
+                            "Student",
+                            "Course",
+                            "Category",
+                            "Fee Amount",
+                            "Status",
+                            "Date Paid",
+                            "Action",
+                          ].map((h) => (
+                            <th
+                              key={h}
+                              className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide"
+                            >
+                              {h}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {feeList.map((app) => (
+                          <tr
+                            key={app._id}
+                            className="hover:bg-gray-50 transition-colors"
+                          >
+                            <td className="px-4 py-3 font-mono text-xs text-indigo-700 font-semibold">
+                              {app.applicationNumber}
+                            </td>
+                            <td className="px-4 py-3 font-medium text-gray-900">
+                              {app.fullName}
+                            </td>
+                            <td className="px-4 py-3 text-gray-600">
+                              {app.appliedFor}
+                            </td>
+                            <td className="px-4 py-3 text-gray-600">
+                              {app.category}
+                            </td>
+                            <td className="px-4 py-3 font-semibold text-gray-900">
+                              ₹
+                              {(app.admissionFeeAmount || 0).toLocaleString(
+                                "en-IN",
+                              )}
+                            </td>
+                            <td className="px-4 py-3">
+                              {app.admissionFeeStatus === "completed" ? (
+                                <span
+                                  className={`px-2 py-1 rounded-full text-xs font-semibold ${app.markedPaidOffline ? "bg-amber-100 text-amber-800" : "bg-green-100 text-green-800"}`}
+                                >
+                                  {app.markedPaidOffline
+                                    ? "Offline"
+                                    : "Paid Online"}
+                                </span>
+                              ) : (
+                                <span className="px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">
+                                  Pending
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-gray-500 text-xs">
+                              {app.admissionFeeDate
+                                ? new Date(
+                                    app.admissionFeeDate,
+                                  ).toLocaleDateString("en-IN")
+                                : "—"}
+                            </td>
+                            <td className="px-4 py-3">
+                              {app.admissionFeeStatus !== "completed" &&
+                                (markingOffline === app._id ? (
+                                  <div className="flex gap-2 items-center">
+                                    <input
+                                      type="text"
+                                      placeholder="Note (optional)"
+                                      value={offlineNote}
+                                      onChange={(e) =>
+                                        setOfflineNote(e.target.value)
+                                      }
+                                      className="text-xs border border-gray-300 rounded px-2 py-1 w-32 focus:ring-1 focus:ring-amber-400"
+                                    />
+                                    <button
+                                      onClick={() =>
+                                        confirmMarkOffline(app._id)
+                                      }
+                                      className="text-xs bg-green-600 text-white px-2 py-1 rounded font-semibold hover:bg-green-700"
+                                    >
+                                      Confirm
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        setMarkingOffline(null);
+                                        setOfflineNote("");
+                                      }}
+                                      className="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded hover:bg-gray-300"
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <button
+                                    onClick={() => handleMarkOffline(app._id)}
+                                    className="text-xs bg-amber-100 text-amber-800 border border-amber-300 px-3 py-1.5 rounded-lg font-semibold hover:bg-amber-200 transition-colors"
+                                  >
+                                    Mark Paid
+                                  </button>
+                                ))}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Mobile card view (mirrors ApplicationTable mobile pattern) */}
+                  <div className="md:hidden divide-y divide-gray-100">
+                    {feeList.map((app) => (
+                      <div key={app._id} className="p-4 space-y-2">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="font-semibold text-gray-900 text-sm">
+                              {app.fullName}
+                            </p>
+                            <p className="font-mono text-xs text-indigo-600">
+                              {app.applicationNumber}
+                            </p>
+                          </div>
+                          {app.admissionFeeStatus === "completed" ? (
+                            <span
+                              className={`px-2 py-1 rounded-full text-xs font-semibold ${app.markedPaidOffline ? "bg-amber-100 text-amber-800" : "bg-green-100 text-green-800"}`}
+                            >
+                              {app.markedPaidOffline ? "Offline" : "Paid"}
+                            </span>
+                          ) : (
+                            <span className="px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">
+                              Pending
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex gap-4 text-xs text-gray-500">
+                          <span>{app.appliedFor}</span>
+                          <span>{app.category}</span>
+                          <span className="font-semibold text-gray-800">
+                            ₹
+                            {(app.admissionFeeAmount || 0).toLocaleString(
+                              "en-IN",
+                            )}
+                          </span>
+                        </div>
+                        {app.admissionFeeStatus !== "completed" &&
+                          (markingOffline === app._id ? (
+                            <div className="flex gap-2 items-center mt-2">
+                              <input
+                                type="text"
+                                placeholder="Note (optional)"
+                                value={offlineNote}
+                                onChange={(e) => setOfflineNote(e.target.value)}
+                                className="text-xs border border-gray-300 rounded px-2 py-1 flex-1 focus:ring-1 focus:ring-amber-400"
+                              />
+                              <button
+                                onClick={() => confirmMarkOffline(app._id)}
+                                className="text-xs bg-green-600 text-white px-2 py-1 rounded font-semibold"
+                              >
+                                Confirm
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setMarkingOffline(null);
+                                  setOfflineNote("");
+                                }}
+                                className="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => handleMarkOffline(app._id)}
+                              className="mt-1 text-xs bg-amber-100 text-amber-800 border border-amber-300 px-3 py-1.5 rounded-lg font-semibold w-full hover:bg-amber-200"
+                            >
+                              Mark Paid (Offline / Cash)
+                            </button>
+                          ))}
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {/* Pagination */}
+              {feeTotalPages > 1 && (
+                <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 text-sm text-gray-600">
+                  <span className="text-xs text-gray-500">
+                    {feeTotal} total records
+                  </span>
+                  <div className="flex gap-2 items-center">
+                    <button
+                      disabled={feePage === 1}
+                      onClick={() => setFeePage((p) => p - 1)}
+                      className="px-3 py-1 rounded border border-gray-200 text-sm disabled:opacity-40 hover:bg-gray-50"
+                    >
+                      Prev
+                    </button>
+                    <span className="text-sm font-medium">
+                      {feePage} / {feeTotalPages}
+                    </span>
+                    <button
+                      disabled={feePage === feeTotalPages}
+                      onClick={() => setFeePage((p) => p + 1)}
+                      className="px-3 py-1 rounded border border-gray-200 text-sm disabled:opacity-40 hover:bg-gray-50"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {viewApp && (

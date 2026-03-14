@@ -246,6 +246,199 @@ const SettingsModal = ({
           />
         </div>
 
+        {/* ── Admission Fee Schedule ─────────────────────────────────────── */}
+        <div style={{ marginBottom: 28 }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: 10,
+            }}
+          >
+            <div>
+              <p
+                style={{
+                  fontSize: 14,
+                  fontWeight: 700,
+                  color: "#1E293B",
+                  margin: "0 0 2px",
+                }}
+              >
+                Admission Fee Schedule
+              </p>
+              <p style={{ fontSize: 11, color: "#94A3B8", margin: 0 }}>
+                Fee amount per course / category. Leave category blank to apply
+                to all categories for that course.
+              </p>
+            </div>
+            <button
+              onClick={() =>
+                setSettingsForm((p) => ({
+                  ...p,
+                  admissionFees: [
+                    ...(p.admissionFees || []),
+                    { course: "Science", category: "", amount: "" },
+                  ],
+                }))
+              }
+              style={{
+                padding: "6px 14px",
+                background: "#EEF2FF",
+                color: "#4338CA",
+                border: "1.5px solid #C7D2FE",
+                borderRadius: 7,
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+              }}
+            >
+              + Add Row
+            </button>
+          </div>
+
+          {/* Header row */}
+          {(settingsForm.admissionFees || []).length > 0 && (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr 90px 36px",
+                gap: 6,
+                marginBottom: 4,
+              }}
+            >
+              {["Course", "Category", "Amount (₹)", ""].map((h) => (
+                <span
+                  key={h}
+                  style={{ fontSize: 11, fontWeight: 600, color: "#94A3B8" }}
+                >
+                  {h}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Fee rows */}
+          {(settingsForm.admissionFees || []).map((fee, idx) => (
+            <div
+              key={idx}
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr 90px 36px",
+                gap: 6,
+                marginBottom: 6,
+              }}
+            >
+              {/* Course */}
+              <select
+                value={fee.course}
+                onChange={(e) => {
+                  const updated = [...settingsForm.admissionFees];
+                  updated[idx] = { ...updated[idx], course: e.target.value };
+                  setSettingsForm((p) => ({ ...p, admissionFees: updated }));
+                }}
+                style={{
+                  padding: "8px 10px",
+                  border: "1.5px solid #E2E8F0",
+                  borderRadius: 7,
+                  fontSize: 13,
+                  background: "#fff",
+                  color: "#1E293B",
+                }}
+              >
+                <option value="Science">Science</option>
+                <option value="Commerce">Commerce</option>
+                <option value="Arts">Arts</option>
+              </select>
+
+              {/* Category */}
+              <select
+                value={fee.category}
+                onChange={(e) => {
+                  const updated = [...settingsForm.admissionFees];
+                  updated[idx] = { ...updated[idx], category: e.target.value };
+                  setSettingsForm((p) => ({ ...p, admissionFees: updated }));
+                }}
+                style={{
+                  padding: "8px 10px",
+                  border: "1.5px solid #E2E8F0",
+                  borderRadius: 7,
+                  fontSize: 13,
+                  background: "#fff",
+                  color: "#1E293B",
+                }}
+              >
+                <option value="">All categories</option>
+                <option value="General">General</option>
+                <option value="OBC">OBC</option>
+                <option value="SC">SC</option>
+                <option value="ST">ST</option>
+                <option value="EWS">EWS</option>
+              </select>
+
+              {/* Amount */}
+              <input
+                type="number"
+                min="0"
+                placeholder="e.g. 5000"
+                value={fee.amount}
+                onChange={(e) => {
+                  const updated = [...settingsForm.admissionFees];
+                  updated[idx] = {
+                    ...updated[idx],
+                    amount: e.target.value === "" ? "" : Number(e.target.value),
+                  };
+                  setSettingsForm((p) => ({ ...p, admissionFees: updated }));
+                }}
+                style={{
+                  padding: "8px 10px",
+                  border: "1.5px solid #E2E8F0",
+                  borderRadius: 7,
+                  fontSize: 13,
+                  boxSizing: "border-box",
+                }}
+              />
+
+              {/* Remove */}
+              <button
+                onClick={() => {
+                  const updated = settingsForm.admissionFees.filter(
+                    (_, i) => i !== idx,
+                  );
+                  setSettingsForm((p) => ({ ...p, admissionFees: updated }));
+                }}
+                style={{
+                  background: "#FEE2E2",
+                  color: "#DC2626",
+                  border: "none",
+                  borderRadius: 7,
+                  fontSize: 15,
+                  cursor: "pointer",
+                  fontWeight: 700,
+                }}
+              >
+                ×
+              </button>
+            </div>
+          ))}
+
+          {(settingsForm.admissionFees || []).length === 0 && (
+            <p
+              style={{
+                fontSize: 12,
+                color: "#94A3B8",
+                textAlign: "center",
+                padding: "12px 0",
+                border: "1.5px dashed #E2E8F0",
+                borderRadius: 8,
+              }}
+            >
+              No fee rows yet. Click &quot;+ Add Row&quot; to configure fees.
+            </p>
+          )}
+        </div>
+
         <div style={{ display: "flex", gap: 12 }}>
           <button
             onClick={() => setShowSettings(false)}

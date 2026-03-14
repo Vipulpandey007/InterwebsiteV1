@@ -249,6 +249,37 @@ const updateApplicationStatus = async (req, res) => {
     const previousStatus = application.status;
     application.status = status;
 
+    // ── Stamp admission fee amount when approving ─────────────────────────
+    if (status === "approved" && !application.admissionFeeAmount) {
+      try {
+        const settings = await AdmissionSettings.getSettings();
+        const fees = settings.admissionFees || [];
+        const feeEntry =
+          fees.find(
+            (f) =>
+              f.course === application.appliedFor &&
+              f.category === application.category,
+          ) ||
+          fees.find(
+            (f) =>
+              f.course === application.appliedFor &&
+              (!f.category || f.category === ""),
+          );
+        if (feeEntry) {
+          application.admissionFeeAmount = feeEntry.amount;
+          console.log(
+            `✅ Admission fee stamped: ₹${feeEntry.amount} for ${application.appliedFor}/${application.category}`,
+          );
+        } else {
+          console.warn(
+            `⚠️  No admission fee configured for ${application.appliedFor}/${application.category}`,
+          );
+        }
+      } catch (feeErr) {
+        console.error("Fee stamping error (non-fatal):", feeErr.message);
+      }
+    }
+
     // Log the status change
     application.activityLog.push({
       action: "status_changed",
@@ -469,6 +500,7 @@ const getSettings = async (req, res) => {
         closeDate: settings.closeDate,
         closedMessage: settings.closedMessage,
         isAccepting: settings.isAccepting,
+        admissionFees: settings.admissionFees || [],
       },
     });
   } catch (error) {
@@ -483,7 +515,14 @@ const getSettings = async (req, res) => {
  */
 const updateSettings = async (req, res) => {
   try {
-    const { session, isOpen, openDate, closeDate, closedMessage } = req.body;
+    const {
+      session,
+      isOpen,
+      openDate,
+      closeDate,
+      closedMessage,
+      admissionFees,
+    } = req.body;
     const settings = await AdmissionSettings.getSettings();
 
     if (session !== undefined) settings.session = session;
@@ -493,6 +532,7 @@ const updateSettings = async (req, res) => {
     if (closeDate !== undefined)
       settings.closeDate = closeDate ? new Date(closeDate) : null;
     if (closedMessage !== undefined) settings.closedMessage = closedMessage;
+    if (admissionFees !== undefined) settings.admissionFees = admissionFees;
 
     await settings.save();
 
@@ -506,6 +546,7 @@ const updateSettings = async (req, res) => {
         closeDate: settings.closeDate,
         closedMessage: settings.closedMessage,
         isAccepting: settings.isAccepting,
+        admissionFees: settings.admissionFees || [],
       },
     });
   } catch (error) {

@@ -22,8 +22,14 @@ api.interceptors.request.use(
       adminToken: adminToken ? "EXISTS" : "MISSING",
     });
 
-    // Use admin token for admin routes, otherwise use user token
-    if (config.url.startsWith("/admin") && adminToken) {
+    // 🚨 FIX: Only apply the admin token to explicit admin routes
+    const isAdminRoute =
+      config.url.startsWith("/admin") ||
+      config.url.startsWith("/admission-fee/stats") ||
+      config.url.startsWith("/admission-fee/list") ||
+      config.url.includes("/mark-offline");
+
+    if (isAdminRoute && adminToken) {
       config.headers.Authorization = `Bearer ${adminToken}`;
       console.log("✅ Added admin token to request");
     } else if (token) {
@@ -51,8 +57,14 @@ api.interceptors.response.use(
     console.error("❌ API Error:", error.config?.url, error.response?.status);
 
     if (error.response?.status === 401) {
-      // Check if admin or user route
-      if (error.config.url.startsWith("/admin")) {
+      // 🚨 FIX: Use the same precise check so students aren't redirected to the admin login
+      const isAdminRoute =
+        error.config.url.startsWith("/admin") ||
+        error.config.url.startsWith("/admission-fee/stats") ||
+        error.config.url.startsWith("/admission-fee/list") ||
+        error.config.url.includes("/mark-offline");
+
+      if (isAdminRoute) {
         console.log("🔒 Admin session expired, redirecting to admin login");
         localStorage.removeItem("adminToken");
         localStorage.removeItem("admin");
@@ -161,6 +173,9 @@ export const adminAPI = {
     console.log("📜 Fetching activity log for application:", id);
     return api.get(`/admin/applications/${id}/activity`);
   },
+
+  // Change admin password
+  changePassword: (data) => api.put("/admin/change-password", data),
 };
 
 export default api;
@@ -169,4 +184,38 @@ export default api;
 export const settingsAPI = {
   getSettings: () => api.get("/admin/settings"),
   updateSettings: (data) => api.put("/admin/settings", data),
+};
+
+// ==================== ADMISSION FEE APIs ====================
+export const admissionFeeAPI = {
+  // Student — create Razorpay order for admission fee
+  createOrder: (applicationId) =>
+    api.post("/admission-fee/create-order", { applicationId }),
+
+  // Student — verify Razorpay payment
+  verifyPayment: (data) => api.post("/admission-fee/verify", data),
+
+  // Student — receipt PDF download URL (opened via window.open, needs absolute URL)
+  receiptURL: (applicationId) => {
+    const token = localStorage.getItem("token");
+    const base = import.meta.env.VITE_API_URL || "http://localhost:5000";
+    return `${base}/api/admission-fee/receipt/${applicationId}?token=${token}`;
+  },
+
+  // Admin — fee management stats
+  getFeeStats: () => api.get("/admission-fee/stats"),
+
+  // Admin — paginated fee list
+  getFeeList: (params = {}) => {
+    const { page = 1, limit = 20, feeStatus, course, search } = params;
+    const query = new URLSearchParams({ page, limit });
+    if (feeStatus && feeStatus !== "all") query.set("feeStatus", feeStatus);
+    if (course && course !== "all") query.set("course", course);
+    if (search) query.set("search", search);
+    return api.get(`/admission-fee/list?${query.toString()}`);
+  },
+
+  // Admin — mark application's admission fee as paid offline
+  markOfflinePaid: (applicationId, note) =>
+    api.post(`/admission-fee/${applicationId}/mark-offline`, { note }),
 };

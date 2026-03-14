@@ -217,6 +217,47 @@ const applicationSchema = new mongoose.Schema(
       default: false,
     },
 
+    // ── Admission Fee (separate from Rs.1000 application fee) ─────────────────
+    admissionFeeAmount: {
+      type: Number,
+      default: 0,
+    },
+    admissionFeeStatus: {
+      type: String,
+      enum: ["pending", "completed", "failed", "waived"],
+      default: "pending",
+    },
+    admissionFeeDate: {
+      type: Date,
+    },
+    admissionTransactionId: {
+      type: String,
+    },
+    admissionRazorpayOrderId: {
+      type: String,
+    },
+    admissionRazorpayPaymentId: {
+      type: String,
+    },
+    admissionRazorpaySignature: {
+      type: String,
+    },
+    admissionFeeReceiptGenerated: {
+      type: Boolean,
+      default: false,
+    },
+    // For offline / cash payments marked by admin
+    markedPaidOffline: {
+      type: Boolean,
+      default: false,
+    },
+    markedPaidBy: {
+      type: String, // admin email
+    },
+    markedPaidNote: {
+      type: String,
+    },
+
     // Disclaimer Agreement
     disclaimerAgreed: {
       type: Boolean,
@@ -234,6 +275,8 @@ const applicationSchema = new mongoose.Schema(
             "created",
             "submitted",
             "payment_completed",
+            "admission_fee_paid",
+            "admission_fee_marked_offline",
           ],
           required: true,
         },
@@ -298,6 +341,9 @@ applicationSchema.index({ applicationNumber: 1 });
 
 // Index: paymentStatus — used in revenue aggregation in getStats
 applicationSchema.index({ paymentStatus: 1 });
+
+// Index: admissionFeeStatus — used in fee management panel filters
+applicationSchema.index({ admissionFeeStatus: 1 });
 
 // Compound index: status + createdAt — used in admin filtered+sorted list
 applicationSchema.index({ status: 1, createdAt: -1 });

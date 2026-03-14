@@ -44,6 +44,7 @@ app.use("/api/applications", require("./routes/application"));
 app.use("/api/payment", require("./routes/payment"));
 app.use("/api/pdf", require("./routes/pdf"));
 app.use("/api/admin", require("./routes/admin"));
+app.use("/api/admission-fee", require("./routes/admissionFee"));
 
 // Health check (not rate limited — exempt from /api limiter)
 app.get("/api/health", (req, res) => {

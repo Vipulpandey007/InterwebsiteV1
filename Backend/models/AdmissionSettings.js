@@ -26,6 +26,26 @@ const admissionSettingsSchema = new mongoose.Schema(
       type: String,
       default: "Applications for this session are now closed.",
     },
+    // ── Per-course admission fee schedule ─────────────────────────────────────
+    // Admin configures these from Settings. On approval, backend stamps the
+    // resolved amount onto the application (application.admissionFeeAmount).
+    admissionFees: [
+      {
+        course: {
+          type: String, // matches application.appliedFor: "Science"|"Commerce"|"Arts"
+          required: true,
+        },
+        category: {
+          type: String, // "General"|"OBC"|"SC"|"ST"|"EWS"|"" (empty = all categories)
+          default: "",
+        },
+        amount: {
+          type: Number,
+          required: true,
+          min: 0,
+        },
+      },
+    ],
   },
   { timestamps: true },
 );
